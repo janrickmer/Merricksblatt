@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>Testfeed</title>
+<item><title><![CDATA[Bundestag debattiert Klimaschutzgesetz]]></title>
+<link>https://example.org/a1</link>
+<description><![CDATA[<p>Der Bundestag berät über eine <b>Reform</b>. Die EU-Kommission beobachtet das Verfahren.</p>]]></description>
+<pubDate>Tue, 04 Aug 2026 06:10:00 GMT</pubDate></item>
+<item><title>Hessen beschließt Nachtragshaushalt in Wiesbaden</title>
+<link>https://example.org/a2</link>
+<description>Der Landtag in Wiesbaden stimmt zu. Kassel erhält Mittel für Schulbau.</description>
+<pubDate>Tue, 04 Aug 2026 05:00:00 GMT</pubDate></item>
+<item><title>Frankreichs Regierung übersteht Votum</title>
+<link>https://example.org/a3</link>
+<description>Paris: Die Nationalversammlung lehnt den Antrag ab, es geht um neue Schulden.</description>
+<pubDate>Mon, 03 Aug 2026 20:00:00 GMT</pubDate></item>
+</channel></rss>

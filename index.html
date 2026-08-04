@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Merricksblatt – unabhängige Nachrichtenübersicht</title>
+<meta name="description" content="Merricksblatt bündelt aktuelle politische und wirtschaftliche Nachrichten aus Tagesschau, FAZ, SZ, Zeit Online, Spiegel, Handelsblatt, taz und Google News – global bis kommunal, passend zur Postleitzahl.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23b2622d'/%3E%3Ctext x='32' y='45' font-family='Calibri,Carlito,sans-serif' font-size='40' font-weight='bold' text-anchor='middle' fill='%23fff'%3EM%3C/text%3E%3C/svg%3E">
+<style>
+/* ── Merricksblatt – Farb- und Formwerte exakt aus dem Claude-Design-Entwurf ── */
+:root{
+  --ink:#111010; --ink-soft:#3c3733; --ink-mild:#57524c; --ink-deep:#2c2825;
+  --muted:#8a837b; --accent:#b2622d; --accent-dark:#8c491a;
+  --rule:#ece8e1; --line:#e5e1da; --dash:#ddd5c8;
+  --paper:#faf7f2; --paper2:#f7f5f1; --hover:#f2eee7;
+  --skel-a:#e8e4dd; --skel-b:#efece6; --spin:#e0dbd2;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:#fff;color:var(--ink);font-family:Calibri,Carlito,sans-serif;font-size:15px;line-height:1.5}
+h1,h2,h3{font-family:Calibri,Carlito,sans-serif}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent-dark);text-decoration:underline;text-underline-offset:3px}
+button{font-family:inherit}
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+::selection{background:rgba(178,98,45,.18)}
+@keyframes mbspin{to{transform:rotate(360deg)}}
+@keyframes mbpulse{0%,100%{opacity:.55}50%{opacity:.22}}
+@media (prefers-reduced-motion: reduce){.spin,.spin-lg,.skel,.dot{animation:none !important}}
+.hidden{display:none !important}
+
+.page{min-height:100vh;padding:0 20px 64px}
+.wrap{max-width:1080px;margin:0 auto}
+
+.topbar{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 0;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--rule)}
+
+.masthead{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:34px 0 22px}
+.brand{font-size:clamp(52px,9vw,104px);line-height:.95;letter-spacing:-.02em;margin:0;color:var(--ink)}
+.slogan{margin:0;font-size:clamp(15px,1.8vw,19px);font-weight:600;color:var(--ink-soft);max-width:680px}
+.plzpill{display:flex;align-items:center;gap:10px;margin-top:6px;padding:7px 16px 7px 13px;border:1px solid var(--line);border-radius:999px;font-size:13px;color:var(--ink-soft)}
+.plzpill b{font-weight:600}
+.linkbtn{border:0;background:transparent;padding:0;margin-left:2px;font-family:inherit;font-size:12px;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.linkbtn:hover{color:var(--accent-dark)}
+
+.tabs{border-top:3px solid var(--ink);border-bottom:1px solid var(--rule)}
+.tabs-inner{display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(14px,3vw,38px)}
+.tab{display:flex;flex-direction:column;align-items:center;gap:9px;border:0;background:transparent;padding:16px 2px 0;cursor:pointer;font-size:clamp(15px,1.7vw,19px);color:var(--ink)}
+.tab:hover{color:var(--accent-dark)}
+.tab .bar{display:block;width:100%;height:4px;background:transparent;border-radius:999px 999px 0 0}
+.tab[aria-current="page"] .bar{background:var(--accent)}
+
+.rubrikrow{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:12px;padding:26px 0 20px}
+.rubrikrow h2{font-size:clamp(24px,3vw,34px);margin:0;color:var(--ink)}
+.rubrikmeta{margin:0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+
+.sections{display:flex;flex-direction:column;gap:22px}
+.srcbox{border:1px solid var(--line);border-radius:24px;padding:clamp(18px,2.4vw,30px);background:#fff}
+.srchead{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding-bottom:4px}
+.srchead h3{font-size:clamp(20px,2.4vw,27px);margin:0;color:var(--ink)}
+.kicker{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+
+.skelwrap{display:flex;flex-direction:column;gap:20px;padding-top:18px}
+.skel{display:flex;flex-direction:column;gap:9px;animation:mbpulse 1.4s ease-in-out infinite}
+.skel i{display:block;border-radius:999px}
+.skel .l1{height:15px;width:72%;background:var(--skel-a)}
+.skel .l2{height:11px;width:96%;background:var(--skel-b)}
+.skel .l3{height:11px;width:88%;background:var(--skel-b)}
+.skel .l4{height:11px;width:54%;background:var(--skel-b)}
+
+.notebox{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:16px;padding:18px 20px;background:var(--paper);border:1px dashed var(--dash);border-radius:18px}
+.notebox p{margin:0;flex:1 1 240px;font-size:14px;color:var(--ink-mild)}
+.btn-quiet{border:1px solid var(--dash);background:#fff;color:var(--ink);font-size:13px;padding:8px 16px;border-radius:999px;cursor:pointer}
+.btn-quiet:hover{background:var(--hover)}
+
+.item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 22px;align-items:start;padding:19px 0;border-top:1px solid var(--rule)}
+.item .col{display:flex;flex-direction:column;gap:7px;min-width:0}
+.item .title{font-weight:700;font-size:clamp(17px,1.9vw,21px);line-height:1.28;color:var(--ink);text-wrap:pretty;text-decoration:none}
+.item .title:hover{color:var(--accent);text-decoration:underline;text-underline-offset:4px}
+.item p{margin:0;max-width:74ch;font-size:15px;line-height:1.58;color:var(--ink-mild);text-wrap:pretty}
+.item time{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap;padding-top:5px}
+@media (max-width:560px){.item{grid-template-columns:1fr}.item time{padding-top:0}}
+
+.morewrap{padding-top:14px;border-top:1px solid var(--rule);font-size:13px;color:var(--muted)}
+.morebtn{border:0;background:transparent;padding:0;font-weight:600;font-size:14px;color:var(--accent);cursor:pointer}
+.morebtn:hover{text-decoration:underline;text-underline-offset:4px}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid var(--spin);border-top-color:var(--accent);border-radius:999px;animation:mbspin .7s linear infinite;vertical-align:-2px;margin-right:9px}
+
+.gnblock{margin-top:44px;padding-top:26px;border-top:3px solid var(--ink);display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.gnbtn{display:inline-flex;align-items:center;background:var(--accent);color:#fff;font-size:15px;padding:13px 24px;border:0;border-radius:999px;text-decoration:none;cursor:pointer}
+.gnbtn:hover{background:var(--accent-dark);color:#fff;text-decoration:none}
+.gnbtn svg{margin-right:8px}
+.gnnote{margin:0;font-size:13px;color:var(--muted)}
+.gnnote span{color:var(--ink-mild)}
+
+.ki{margin-top:30px;padding:clamp(20px,2.6vw,32px);background:var(--paper2);border:1px solid var(--line);border-radius:28px}
+.ki .kick{margin:0 0 8px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.ki h3{font-size:clamp(20px,2.4vw,26px);margin:0 0 6px;color:var(--ink)}
+.ki .desc{margin:0 0 18px;font-size:14px;color:var(--ink-mild);max-width:640px}
+.kibtn{background:var(--ink);color:#fff;font-size:15px;padding:13px 24px;border:0;border-radius:999px;cursor:pointer}
+.kibtn:hover{background:var(--accent)}
+.kibusy{display:flex;align-items:center;gap:12px;font-size:14px;color:var(--ink-mild)}
+.spin-lg{display:block;width:17px;height:17px;border:2.5px solid var(--spin);border-top-color:var(--accent);border-radius:999px;animation:mbspin .7s linear infinite}
+.kiout{padding:22px clamp(18px,2.4vw,26px);background:#fff;border:1px solid var(--line);border-radius:20px}
+.kiout p{margin:0 0 12px;max-width:78ch;font-size:15px;line-height:1.62;color:var(--ink-deep);text-wrap:pretty}
+.kifoot{margin:8px 0 0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.kirow{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:18px}
+.speakbtn{background:#fff;color:var(--ink);border:1px solid var(--ink);font-size:14px;padding:11px 20px;border-radius:999px;cursor:pointer}
+.speakbtn:hover{background:var(--ink);color:#fff}
+.speakmeta{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.speaking{display:flex;align-items:center;font-size:12px;color:var(--ink-mild)}
+.dot{display:inline-block;width:7px;height:7px;border-radius:999px;background:var(--accent);animation:mbpulse 1s ease-in-out infinite;margin-right:7px}
+
+.foot{margin-top:40px;padding-top:18px;border-top:1px solid var(--rule);display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:space-between;font-size:12px;color:var(--muted)}
+.foot .credits{flex-basis:100%;font-size:11px}
+
+.modalback{position:fixed;inset:0;display:grid;place-items:center;padding:20px;background:rgba(17,16,16,.5);z-index:20}
+.modal{width:min(430px,100%);background:#fff;border-radius:26px;padding:28px;display:flex;flex-direction:column;gap:14px}
+.modal .kick{margin:0;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.modal h3{font-size:23px;margin:0;color:var(--ink)}
+.modal .body{margin:0;font-size:14px;line-height:1.55;color:var(--ink-mild)}
+.plzin{border:1px solid var(--dash);background:#fff;font-family:inherit;font-size:16px;padding:12px 18px;color:var(--ink);border-radius:999px;width:100%}
+.modal .err{margin:0;font-size:13px;color:var(--accent-dark)}
+.mrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;align-items:center}
+.mprim{background:var(--accent);color:#fff;border:0;font-size:14px;padding:11px 22px;border-radius:999px;cursor:pointer}
+.mprim:hover{background:var(--accent-dark)}
+.msec{background:#fff;color:var(--ink);border:1px solid var(--dash);font-size:14px;padding:11px 22px;border-radius:999px;cursor:pointer}
+.msec:hover{background:var(--hover)}
+</style>
+</head>
+<body>
+<div class="page"><div class="wrap">
+
+  <div class="topbar">
+    <span id="datum">–</span>
+    <span>von Jan-Rickmer Feindt entwickelte unabhängige Nachrichtenübersicht</span>
+    <span>Ausgabe Nr. <span id="ausgabe">–</span></span>
+  </div>
+
+  <header class="masthead">
+    <h1 class="brand">Merricksblatt</h1>
+    <p class="slogan">Mit MERRICK mehr Blick für die aktuellsten News!</p>
+    <div class="plzpill">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#b2622d" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+      <b id="plzLabel">wird ermittelt …</b>
+      <button type="button" class="linkbtn" id="plzChange">ändern</button>
+    </div>
+  </header>
+
+  <nav class="tabs" aria-label="Rubriken"><div class="tabs-inner" id="tabs"></div></nav>
+
+  <div class="rubrikrow">
+    <h2 id="rubrik">Globales</h2>
+    <p class="rubrikmeta" id="rubrikMeta">Beiträge werden geladen …</p>
+  </div>
+
+  <div class="sections" id="sections" aria-live="polite"></div>
+
+  <div class="gnblock">
+    <a class="gnbtn" id="gnBtn" href="https://news.google.com/?hl=de&amp;gl=DE&amp;ceid=DE%3Ade" target="_blank" rel="noopener">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10"></path><path d="M4 12h16"></path><path d="M4 18h13"></path></svg>
+      Google News öffnen
+    </a>
+    <p class="gnnote">Öffnet in einem neuen Tab, vorgefiltert auf: <span id="gnFilter">wird ermittelt</span></p>
+  </div>
+
+  <section class="ki" id="kiBox">
+    <p class="kick">Merrick KI · kein redaktioneller Beitrag</p>
+    <h3>Zusammenfassung dieser Seite</h3>
+    <p class="desc">Fasst ausschließlich die oben angezeigten Titel und Inhaltsangaben zusammen. Keine eigene Recherche, keine Bewertung.</p>
+
+    <div id="kiIdle">
+      <button type="button" class="kibtn" id="kiStart">KI-Zusammenfassung aller angezeigten Informationen erstellen</button>
+    </div>
+    <div id="kiBusy" class="kibusy hidden">
+      <span class="spin-lg" aria-hidden="true"></span>
+      <span id="kiBusyLabel">Fasst Beiträge zusammen …</span>
+    </div>
+    <div id="kiDone" class="hidden">
+      <div class="kiout">
+        <div id="kiText"></div>
+        <p class="kifoot" id="kiFoot"></p>
+      </div>
+      <div class="kirow">
+        <button type="button" class="speakbtn" id="speakBtn">Textzusammenfassung vorlesen</button>
+        <span class="speakmeta">Stimme Deutsch · 1,35-fache Geschwindigkeit</span>
+        <span class="speaking hidden" id="speakingNote"><span class="dot" aria-hidden="true"></span>wird vorgelesen</span>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span>Merricksblatt · Übersicht fremder Inhalte, alle Rechte bei den verlinkten Medien</span>
+    <span>Standort: <span id="plzFoot">–</span></span>
+    <span class="credits">PLZ-Zuordnung: GeoNames-Daten via zauberware (CC BY 4.0) · Nachrichtendaten: RSS-Feeds der Verlage &amp; Google News, halbstündlich über GitHub Actions aktualisiert · KI-Zusammenfassung: Pollinations.AI (mit lokaler Ersatzfassung) · Vorlesen: Sprachausgabe des Browsers</span>
+  </footer>
+
+</div>
+
+<div class="modalback hidden" id="plzModal" role="dialog" aria-modal="true" aria-labelledby="plzModalTitle">
+  <div class="modal">
+    <p class="kick">Standort</p>
+    <h3 id="plzModalTitle">Postleitzahl konnte nicht ermittelt werden</h3>
+    <p class="body" id="plzModalBody">Bitte geben Sie Ihre Postleitzahl ein, damit die Punkte „Bundesland“ und „Kommunales“ passende Nachrichten zeigen. Ohne Angabe verwenden wir 34132.</p>
+    <input class="plzin" id="plzInput" inputmode="numeric" maxlength="5" placeholder="z. B. 34132" autocomplete="postal-code">
+    <p class="err hidden" id="plzErr">Keine gültige deutsche Postleitzahl. Wir verwenden 34132.</p>
+    <div class="mrow">
+      <button type="button" class="mprim" id="plzSave">Übernehmen</button>
+      <button type="button" class="msec" id="plzSkip">34132 verwenden</button>
+      <button type="button" class="linkbtn" id="plzGeo">Gerätestandort verwenden</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<noscript><p style="max-width:640px;margin:20px auto;font-family:Calibri,Carlito,sans-serif">Merricksblatt benötigt JavaScript, um die Nachrichten der Verlage zu laden und anzuzeigen.</p></noscript>
+
+<script src="assets/plz.js"></script>
+<script>
+(function () {
+"use strict";
+
+/* ───────────────────────────── Grunddaten ───────────────────────────── */
+
+var STATES = {BW:"Baden-Württemberg",BY:"Bayern",BE:"Berlin",BB:"Brandenburg",
+  HB:"Bremen",HH:"Hamburg",HE:"Hessen",MV:"Mecklenburg-Vorpommern",
+  NI:"Niedersachsen",NW:"Nordrhein-Westfalen",RP:"Rheinland-Pfalz",SL:"Saarland",
+  SN:"Sachsen",ST:"Sachsen-Anhalt",SH:"Schleswig-Holstein",TH:"Thüringen"};
+var CAPITALS = {BW:"Stuttgart",BY:"München",BE:"Berlin",BB:"Potsdam",HB:"Bremen",
+  HH:"Hamburg",HE:"Wiesbaden",MV:"Schwerin",NI:"Hannover",NW:"Düsseldorf",
+  RP:"Mainz",SL:"Saarbrücken",SN:"Dresden",ST:"Magdeburg",SH:"Kiel",TH:"Erfurt"};
+
+var MEDIA = [
+  ["ts","Tagesschau.de","https://www.tagesschau.de/","tagesschau.de"],
+  ["faz","Frankfurter Allgemeine Zeitung","https://www.faz.net/aktuell/politik/","faz.net"],
+  ["sz","Süddeutsche Zeitung","https://www.sueddeutsche.de/politik","sueddeutsche.de"],
+  ["zeit","Zeit Online","https://www.zeit.de/politik/index","zeit.de"],
+  ["spiegel","Spiegel","https://www.spiegel.de/politik/","spiegel.de"],
+  ["hb","Handelsblatt","https://www.handelsblatt.com/politik/","handelsblatt.com"],
+  ["taz","TAZ","https://taz.de/Politik/!p4615/","taz.de"],
+  ["gn","Google News","https://news.google.com/?hl=de&gl=DE&ceid=DE%3Ade",null]
+];
+var MEDIA_BY = {};
+MEDIA.forEach(function (m) { MEDIA_BY[m[0]] = {id:m[0], name:m[1], home:m[2], domain:m[3]}; });
+
+var PROXIES = [
+  function (u) { return "https://api.allorigins.win/raw?url=" + encodeURIComponent(u); },
+  function (u) { return "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(u); },
+  function (u) { return "https://api.allorigins.win/get?url=" + encodeURIComponent(u); }
+];
+
+function gnRss(q)    { return "https://news.google.com/rss/search?q=" + encodeURIComponent(q) + "&hl=de&gl=DE&ceid=DE:de"; }
+function gnSearch(q) { return "https://news.google.com/search?q=" + encodeURIComponent(q) + "&hl=de&gl=DE&ceid=DE%3Ade"; }
+
+/* ─────────────────────────── PLZ-Datenbank ──────────────────────────── */
+
+var PLZMAP = {}, PLZARR = [];
+(function () {
+  var raw = window.MB_PLZ_RAW;
+  if (typeof raw !== "string") {
+    PLZMAP["34132"] = {ort:"Kassel", land:"HE", lat:51.32, lon:9.5};
+    PLZARR.push(["34132", 51.32, 9.5]);
+    return;
+  }
+  raw.split("|").forEach(function (grp) {
+    var i = grp.indexOf(":"), land = grp.slice(0, i);
+    grp.slice(i + 1).split("~").forEach(function (e) {
+      var p = e.split(";");
+      var rec = {ort:p[1], land:land, lat:parseFloat(p[2]), lon:parseFloat(p[3])};
+      PLZMAP[p[0]] = rec;
+      PLZARR.push([p[0], rec.lat, rec.lon]);
+    });
+  });
+})();
+
+function nearestPlz(lat, lon) {
+  var best = null, bd = Infinity, cl = Math.cos(lat * Math.PI / 180);
+  for (var i = 0; i < PLZARR.length; i++) {
+    var dy = PLZARR[i][1] - lat, dx = (PLZARR[i][2] - lon) * cl, d = dx * dx + dy * dy;
+    if (d < bd) { bd = d; best = PLZARR[i][0]; }
+  }
+  return best;
+}
+
+/* ───────────────────────────── Zustand ──────────────────────────────── */
+
+var cur = {
+  tab: "globales",
+  plz: "34132",
+  place: PLZMAP["34132"] || {ort:"Kassel", land:"HE", lat:51.32, lon:9.5},
+  shown: {},          // "tab:srcId" → Anzahl sichtbarer Beiträge
+  cache: {},          // Datei/Schlüssel → {data, ts}
+  kommune: {},        // plz → {srcId: {items|err}}
+  rendered: [],       // aktuell sichtbare Quellen inkl. Beiträge (für die KI)
+  ai: "idle",
+  aiParas: [], aiLocal: false, aiCount: 0,
+  speaking: false
+};
+
+function landName()  { return STATES[cur.place.land] || "Hessen"; }
+function landFile()  { return "data/land-" + (cur.place.land || "he").toLowerCase() + ".json"; }
+
+var TABS = [
+  { id:"globales", label:function(){return "Globales";}, file:function(){return "data/global.json";},
+    meta:"Politik & Wirtschaft weltweit",
+    gnQ:function(){return "Weltpolitik OR Weltwirtschaft when:1d";},
+    gnFilter:function(){return "Weltpolitik und Weltwirtschaft, letzte 24 Stunden, Deutsch";} },
+  { id:"europa", label:function(){return "Europa";}, file:function(){return "data/europa.json";},
+    meta:"Politik & Wirtschaft in Europa",
+    gnQ:function(){return "EU OR Europapolitik OR EU-Wirtschaft when:1d";},
+    gnFilter:function(){return "Europapolitik und EU-Wirtschaft, letzte 24 Stunden, Deutsch";} },
+  { id:"deutschland", label:function(){return "Deutschland";}, file:function(){return "data/deutschland.json";},
+    meta:"Innenpolitik & Wirtschaft",
+    gnQ:function(){return "Bundespolitik OR Bundesregierung OR Bundestag when:1d";},
+    gnFilter:function(){return "Bundespolitik und deutsche Wirtschaft, letzte 24 Stunden";} },
+  { id:"land", label:landName, file:landFile,
+    meta:"Landespolitik & Wirtschaft",
+    gnQ:function(){return '"' + landName() + '" Landespolitik OR Landtag OR ' + (CAPITALS[cur.place.land] || "") + " when:2d";},
+    gnFilter:function(){return landName() + ": Landespolitik und Wirtschaft, letzte 48 Stunden";} },
+  { id:"kommune", label:function(){return cur.place.ort;}, file:null,
+    meta:"Kommunalpolitik · Google News zuerst",
+    gnQ:function(){return '"' + cur.place.ort + '" Kommunalpolitik OR Stadtrat OR Gemeinderat OR Rathaus when:7d';},
+    gnFilter:function(){return cur.place.ort + ": kommunale Politik und Verwaltung, letzte 7 Tage";} }
+];
+function tabDef(id) { for (var i=0;i<TABS.length;i++) if (TABS[i].id===id) return TABS[i]; return TABS[0]; }
+
+/* ───────────────────────────── Helfer ───────────────────────────────── */
+
+var $ = function (id) { return document.getElementById(id); };
+function el(tag, cls, text) {
+  var n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
+function hhmm(d) {
+  d = d instanceof Date ? d : new Date(d);
+  if (isNaN(d)) return "–";
+  return String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
+}
+function timeago(s) {
+  if (!s) return "";
+  var d = new Date(s); if (isNaN(d)) return "";
+  var m = Math.round((Date.now() - d.getTime()) / 60000);
+  if (m < 1) return "gerade eben";
+  if (m < 60) return "vor " + m + " Min";
+  var h = Math.round(m / 60);
+  if (h < 24) return "vor " + h + " Std";
+  var t = Math.round(h / 24);
+  if (t <= 7) return "vor " + t + (t === 1 ? " Tag" : " Tagen");
+  return d.toLocaleDateString("de-DE", {day:"numeric", month:"short"});
+}
+function fetchTimeout(url, opts, ms) {
+  var ctl = ("AbortController" in window) ? new AbortController() : null;
+  var t = ctl && setTimeout(function () { ctl.abort(); }, ms || 15000);
+  var o = Object.assign({}, opts || {}, ctl ? {signal: ctl.signal} : {});
+  return fetch(url, o).finally(function () { if (t) clearTimeout(t); });
+}
+
+/* ─────────────────────── Kopfzeile & Navigation ─────────────────────── */
+
+function initHeader() {
+  var now = new Date();
+  $("datum").textContent = now.toLocaleDateString("de-DE",
+    {weekday:"long", day:"numeric", month:"long", year:"numeric"});
+  var start = new Date(now.getFullYear(), 0, 0);
+  $("ausgabe").textContent = Math.floor((now - start) / 86400000) + 1;
+}
+
+function renderTabs() {
+  var box = $("tabs"); box.textContent = "";
+  TABS.forEach(function (t) {
+    var b = el("button", "tab"); b.type = "button";
+    b.appendChild(el("span", null, t.label()));
+    b.appendChild(el("span", "bar"));
+    if (t.id === cur.tab) b.setAttribute("aria-current", "page");
+    b.addEventListener("click", function () { selectTab(t.id); });
+    box.appendChild(b);
+  });
+}
+
+function selectTab(id) {
+  cur.tab = id;
+  stopSpeak();
+  resetAi();
+  renderTabs();
+  renderRubrik();
+}
+
+/* ─────────────────────────── PLZ-Logik ──────────────────────────────── */
+
+function applyPlz(plz, opts) {
+  opts = opts || {};
+  var rec = PLZMAP[plz];
+  if (!rec) { plz = "34132"; rec = PLZMAP["34132"] || cur.place; }
+  var changed = plz !== cur.plz;
+  cur.plz = plz; cur.place = rec;
+  try { localStorage.setItem("mb_plz", plz); } catch (e) {}
+  var label = plz + " " + rec.ort;
+  $("plzLabel").textContent = label;
+  $("plzFoot").textContent = label;
+  renderTabs();
+  if (changed && (cur.tab === "land" || cur.tab === "kommune")) {
+    resetAi(); renderRubrik();
+  } else if (opts.rerender) {
+    renderRubrik();
+  }
+}
+
+function tryGeolocate(onFail) {
+  if (!navigator.geolocation) { onFail && onFail(); return; }
+  navigator.geolocation.getCurrentPosition(
+    function (pos) {
+      var p = nearestPlz(pos.coords.latitude, pos.coords.longitude);
+      if (p) applyPlz(p); else (onFail && onFail());
+    },
+    function () { onFail && onFail(); },
+    {timeout: 7000, maximumAge: 600000}
+  );
+}
+
+var modalMode = "auto";
+function openModal(mode) {
+  modalMode = mode;
+  $("plzModalTitle").textContent = mode === "auto"
+    ? "Postleitzahl konnte nicht ermittelt werden" : "Postleitzahl ändern";
+  $("plzModalBody").textContent = mode === "auto"
+    ? "Bitte geben Sie Ihre Postleitzahl ein, damit die Punkte „Bundesland“ und „Kommunales“ passende Nachrichten zeigen. Ohne Angabe verwenden wir 34132."
+    : "Geben Sie eine deutsche Postleitzahl ein – die Rubriken „Bundesland“ und „Kommunales“ richten sich danach.";
+  $("plzInput").value = mode === "auto" ? "" : cur.plz;
+  $("plzErr").classList.add("hidden");
+  $("plzModal").classList.remove("hidden");
+  setTimeout(function () { $("plzInput").focus(); }, 30);
+}
+function closeModal() { $("plzModal").classList.add("hidden"); }
+
+function initPlz() {
+  var saved = null;
+  try { saved = localStorage.getItem("mb_plz"); } catch (e) {}
+  if (saved && PLZMAP[saved]) { applyPlz(saved); return; }
+  tryGeolocate(function () { openModal("auto"); });
+}
+
+$("plzChange").addEventListener("click", function () { openModal("manual"); });
+$("plzGeo").addEventListener("click", function () {
+  closeModal();
+  tryGeolocate(function () { openModal(modalMode); });
+});
+$("plzInput").addEventListener("input", function () {
+  this.value = this.value.replace(/\D/g, "").slice(0, 5);
+  $("plzErr").classList.add("hidden");
+});
+$("plzInput").addEventListener("keydown", function (e) { if (e.key === "Enter") $("plzSave").click(); });
+$("plzSave").addEventListener("click", function () {
+  var v = $("plzInput").value;
+  if (/^\d{5}$/.test(v)) { applyPlz(PLZMAP[v] ? v : "34132"); closeModal(); }
+  else $("plzErr").classList.remove("hidden");
+});
+$("plzSkip").addEventListener("click", function () { applyPlz("34132"); closeModal(); });
+$("plzModal").addEventListener("click", function (e) {
+  if (e.target === this) { if (modalMode === "auto") applyPlz("34132"); closeModal(); }
+});
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape" && !$("plzModal").classList.contains("hidden")) {
+    if (modalMode === "auto") applyPlz("34132");
+    closeModal();
+  }
+});
+
+/* ────────────────────── Rubrik anzeigen (fest) ──────────────────────── */
+
+function renderRubrik() {
+  var t = tabDef(cur.tab);
+  $("rubrik").textContent = t.label();
+  $("rubrikMeta").textContent = "Beiträge werden geladen …";
+  $("gnBtn").href = gnSearch(t.gnQ());
+  $("gnFilter").textContent = t.gnFilter();
+  if (cur.tab === "kommune") loadKommune();
+  else loadFixed(t);
+}
+
+function metaLine(t, updated) {
+  return t.meta + " · 8 Quellen · aktualisiert " + hhmm(updated || new Date());
+}
+
+function loadFixed(t, force) {
+  var file = t.file();
+  var c = cur.cache[file];
+  if (c && !force && Date.now() - c.ts < 10 * 60000) { renderFixed(t, c.data); return; }
+  showSkeletons();
+  fetchTimeout(file + "?t=" + Math.floor(Date.now() / 60000), {cache:"no-store"}, 15000)
+    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function (data) {
+      cur.cache[file] = {data:data, ts:Date.now()};
+      if (tabDef(cur.tab).file && tabDef(cur.tab).file() === file) renderFixed(t, data);
+    })
+    .catch(function () {
+      if (location.protocol === "file:") { renderDemo(t); return; }
+      if (c) { renderFixed(t, c.data); return; }
+      renderLoadError(t, file);
+    });
+}
+
+function renderFixed(t, data) {
+  $("rubrikMeta").textContent = metaLine(t, data.updated);
+  var box = $("sections"); box.textContent = "";
+  cur.rendered = [];
+  (data.sources || []).forEach(function (src) {
+    box.appendChild(buildBox(t, {
+      id: src.id, name: src.name, home: src.home,
+      items: src.items || [], stale: !!src.stale, err: !!src.err,
+      retry: function () { loadFixed(t, true); }
+    }));
+  });
+}
+
+function showSkeletons() {
+  var box = $("sections"); box.textContent = "";
+  for (var i = 0; i < 4; i++) {
+    var s = el("section", "srcbox");
+    var head = el("div", "srchead");
+    head.appendChild(el("h3", null, "Wird geladen"));
+    head.appendChild(el("span", "kicker", "Politik & Wirtschaft"));
+    s.appendChild(head);
+    var w = el("div", "skelwrap");
+    for (var j = 0; j < 3; j++) {
+      var k = el("div", "skel");
+      ["l1","l2","l3","l4"].forEach(function (c) { k.appendChild(el("i", c)); });
+      w.appendChild(k);
+    }
+    s.appendChild(w);
+    box.appendChild(s);
+  }
+}
+
+function renderLoadError(t, file) {
+  $("rubrikMeta").textContent = t.meta + " · Daten nicht erreichbar";
+  var box = $("sections"); box.textContent = "";
+  var s = el("section", "srcbox");
+  var head = el("div", "srchead");
+  head.appendChild(el("h3", null, "Daten noch nicht bereit"));
+  s.appendChild(head);
+  var n = el("div", "notebox");
+  n.appendChild(el("p", null, "Die Nachrichtendaten (" + file + ") konnten nicht geladen werden. " +
+    "Direkt nach dem ersten Veröffentlichen dauert es einige Minuten, bis der GitHub-Actions-Lauf " +
+    "„Merricksblatt Feeds“ die Daten erzeugt hat. Danach aktualisieren sie sich halbstündlich von selbst."));
+  var b = el("button", "btn-quiet", "Erneut versuchen"); b.type = "button";
+  b.addEventListener("click", function () { loadFixed(t, true); });
+  n.appendChild(b);
+  s.appendChild(n);
+  box.appendChild(s);
+  cur.rendered = [];
+}
+
+/* ─────────────────────── Quelle als Kasten bauen ────────────────────── */
+
+function buildBox(t, src) {
+  var key = cur.tab + ":" + src.id;
+  if (!cur.shown[key]) cur.shown[key] = 3;
+  var box = el("section", "srcbox");
+  var head = el("div", "srchead");
+  head.appendChild(el("h3", null, src.name));
+  var kick = src.kicker || "Politik & Wirtschaft";
+  if (src.stale) kick += " · zwischengespeicherter Stand";
+  head.appendChild(el("span", "kicker", kick));
+  box.appendChild(head);
+
+  if (src.loading) {
+    var w = el("div", "skelwrap");
+    for (var j = 0; j < 3; j++) {
+      var k = el("div", "skel");
+      ["l1","l2","l3","l4"].forEach(function (c) { k.appendChild(el("i", c)); });
+      w.appendChild(k);
+    }
+    box.appendChild(w);
+    return box;
+  }
+
+  if (src.err) {
+    var n = el("div", "notebox");
+    n.appendChild(el("p", null, "Beiträge konnten nicht geladen werden. Der Feed dieses Mediums antwortet gerade nicht."));
+    var b = el("button", "btn-quiet", "Erneut versuchen"); b.type = "button";
+    b.addEventListener("click", src.retry || function () { renderRubrik(); });
+    n.appendChild(b);
+    box.appendChild(n);
+    return box;
+  }
+
+  if (!src.items.length) {
+    var n2 = el("div", "notebox");
+    var msg = (cur.tab === "kommune")
+      ? "Keine aktuellen Treffer bei " + src.name + " zu " + cur.place.ort + "."
+      : "Zurzeit keine passenden Beiträge von " + src.name + " in dieser Rubrik.";
+    n2.appendChild(el("p", null, msg));
+    if (src.searchUrl) {
+      var a0 = el("a", null, "Bei Google News suchen →");
+      a0.href = src.searchUrl; a0.target = "_blank"; a0.rel = "noopener";
+      n2.appendChild(a0);
+    }
+    box.appendChild(n2);
+    cur.rendered.push({name: src.name, items: []});
+    return box;
+  }
+
+  var shown = src.items.slice(0, cur.shown[key]);
+  shown.forEach(function (it) {
+    var art = el("article", "item");
+    var col = el("div", "col");
+    var a = el("a", "title", it.t);
+    a.href = it.u; a.target = "_blank"; a.rel = "noopener";
+    col.appendChild(a);
+    if (it.s) col.appendChild(el("p", null, it.s));
+    art.appendChild(col);
+    art.appendChild(el("time", null, timeago(it.d)));
+    box.appendChild(art);
+  });
+  cur.rendered.push({name: src.name, items: shown});
+
+  var mw = el("div", "morewrap");
+  if (src.items.length > shown.length) {
+    var mb = el("button", "morebtn", "Drei weitere Beiträge laden →"); mb.type = "button";
+    mb.addEventListener("click", function () {
+      cur.shown[key] += 3;
+      var fresh = buildBox(t, src);
+      box.replaceWith(fresh);
+      rebuildRenderedList();
+    });
+    mw.appendChild(mb);
+  } else {
+    mw.appendChild(document.createTextNode("Alle geladenen Beiträge angezeigt · "));
+    var more = el("a", null, "Mehr direkt bei " + src.name + " →");
+    more.href = src.home || src.searchUrl || "#"; more.target = "_blank"; more.rel = "noopener";
+    mw.appendChild(more);
+  }
+  box.appendChild(mw);
+  return box;
+}
+
+function rebuildRenderedList() {
+  // nach „mehr laden“ die KI-Grundlage neu einsammeln
+  cur.rendered = [];
+  var boxes = $("sections").querySelectorAll(".srcbox");
+  boxes.forEach(function (b) {
+    var name = (b.querySelector("h3") || {}).textContent || "";
+    var items = [];
+    b.querySelectorAll(".item").forEach(function (it) {
+      items.push({
+        t: (it.querySelector(".title") || {}).textContent || "",
+        s: (it.querySelector("p") || {}).textContent || ""
+      });
+    });
+    cur.rendered.push({name: name, items: items});
+  });
+}
+
+/* ─────────────────────── Kommunales (live im Browser) ───────────────── */
+
+function kommuneSources() {
+  var ort = cur.place.ort;
+  var list = [{
+    id: "gn", name: "Google News", home: MEDIA_BY.gn.home,
+    kicker: "Aggregiert · zuerst geladen",
+    q: tabDef("kommune").gnQ()
+  }];
+  MEDIA.forEach(function (m) {
+    if (m[0] === "gn") return;
+    list.push({
+      id: m[0], name: m[1], home: m[2],
+      q: '"' + ort + '" site:' + m[3] + " when:14d"
+    });
+  });
+  return list;
+}
+
+function loadKommune() {
+  var t = tabDef("kommune");
+  var plz = cur.plz;
+  if (!cur.kommune[plz]) cur.kommune[plz] = {};
+  var store = cur.kommune[plz];
+  var srcs = kommuneSources();
+  var box = $("sections"); box.textContent = "";
+  cur.rendered = [];
+  var slots = {};
+
+  srcs.forEach(function (s) {
+    var state = store[s.id];
+    var node = buildBox(t, blockFor(s, state));
+    slots[s.id] = node;
+    box.appendChild(node);
+  });
+  updateKommuneMeta(store, srcs);
+
+  var queue = srcs.filter(function (s) { return !store[s.id]; });
+  var running = 0;
+  function launch(s) {
+    running++;
+    fetchViaProxy(gnRss(s.q)).then(function (xml) {
+      store[s.id] = {items: parseGnXml(xml)};
+    }).catch(function () {
+      store[s.id] = {err: true};
+    }).finally(function () {
+      running--;
+      if (cur.tab === "kommune" && cur.plz === plz && slots[s.id]) {
+        var fresh = buildBox(t, blockFor(s, store[s.id]));
+        slots[s.id].replaceWith(fresh);
+        slots[s.id] = fresh;
+        rebuildRenderedList();
+        updateKommuneMeta(store, srcs);
+      }
+      next();
+    });
+  }
+  function next() {
+    if (cur.tab !== "kommune" || cur.plz !== plz) return;
+    while (running < 3 && queue.length) launch(queue.shift());
+  }
+  next();
+
+  function blockFor(s, state) {
+    var base = {
+      id: s.id, name: s.name, home: s.home, kicker: s.kicker,
+      searchUrl: gnSearch(s.q),
+      retry: function () { delete store[s.id]; loadKommune(); }
+    };
+    if (!state) return Object.assign(base, {loading: true, items: []});
+    if (state.err) return Object.assign(base, {err: true, items: []});
+    return Object.assign(base, {items: state.items});
+  }
+}
+
+function updateKommuneMeta(store, srcs) {
+  var done = srcs.filter(function (s) { return store[s.id]; }).length;
+  var t = tabDef("kommune");
+  $("rubrikMeta").textContent = (done < srcs.length)
+    ? t.meta + " · lädt " + done + "/" + srcs.length + " Quellen …"
+    : metaLine(t, new Date());
+}
+
+function fetchViaProxy(url) {
+  var i = 0;
+  function attempt() {
+    if (i >= PROXIES.length) return Promise.reject(new Error("alle Proxys fehlgeschlagen"));
+    var pu = PROXIES[i](url); var isJson = pu.indexOf("/get?url=") > -1; i++;
+    return fetchTimeout(pu, {cache:"no-store"}, 12000).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return isJson
+        ? r.json().then(function (j) { return j && j.contents ? j.contents : Promise.reject(new Error("leer")); })
+        : r.text();
+    }).then(function (txt) {
+      if (!txt || txt.indexOf("<") < 0) throw new Error("keine XML-Antwort");
+      return txt;
+    }).catch(attempt);
+  }
+  return attempt();
+}
+
+function parseGnXml(xmlText) {
+  var doc = new DOMParser().parseFromString(xmlText, "text/xml");
+  if (doc.querySelector("parsererror")) return [];
+  var out = [];
+  doc.querySelectorAll("item").forEach(function (n) {
+    function g(sel) { var e = n.querySelector(sel); return e ? e.textContent.trim() : ""; }
+    var t = g("title"), u = g("link"), d = g("pubDate");
+    var srcEl = n.querySelector("source");
+    var srcName = srcEl ? srcEl.textContent.trim() : "";
+    var s = g("description");
+    if (s) {
+      var tmp = document.createElement("div"); tmp.innerHTML = s;
+      s = (tmp.textContent || "").replace(/\s+/g, " ").trim();
+    }
+    if (srcName && t.slice(-srcName.length - 3) === " - " + srcName) {
+      t = t.slice(0, -(srcName.length + 3)).trim();
+    }
+    if (!s || s === t || t.indexOf(s.slice(0, 40)) === 0) {
+      s = srcName ? "Meldung bei " + srcName + " – Titel anklicken, um den Beitrag beim Medium zu lesen." : "";
+    }
+    if (s.length > 320) s = s.slice(0, 317).trim() + " …";
+    if (t && u) out.push({t:t, s:s, u:u, d:d});
+  });
+  return out.slice(0, 30);
+}
+
+/* ────────────────── Vorschaumodus für lokale Datei ──────────────────── */
+
+function renderDemo(t) {
+  $("rubrikMeta").textContent = t.meta + " · Vorschau mit Beispieldaten (lokale Ansicht)";
+  var box = $("sections"); box.textContent = "";
+  cur.rendered = [];
+  var demo = [
+    {t:"Beispielbeitrag: So sieht ein geladener Artikel aus", s:"Dies ist ein Platzhaltertext. Auf der veröffentlichten Seite stehen hier Titel und Inhaltsangabe aus dem RSS-Feed des Mediums – erzeugt vom halbstündlichen GitHub-Actions-Lauf.", u:"https://example.org", d:new Date().toISOString()},
+    {t:"Zweiter Beispielbeitrag mit etwas längerem Titel für den Umbruchtest", s:"Auch dieser Eintrag ist nur eine Vorschau. Lokale Dateien dürfen aus Sicherheitsgründen keine data/-JSONs nachladen – online funktioniert genau das automatisch.", u:"https://example.org", d:new Date(Date.now()-3600000).toISOString()}
+  ];
+  MEDIA.slice(0, 4).forEach(function (m) {
+    box.appendChild(buildBox(t, {id:m[0], name:m[1], home:m[2], kicker:"Vorschau · Beispieldaten", items:demo}));
+  });
+}
+
+/* ───────────────────────── KI-Zusammenfassung ───────────────────────── */
+
+function resetAi() {
+  cur.ai = "idle"; cur.aiParas = []; cur.aiLocal = false; cur.aiCount = 0;
+  $("kiIdle").classList.remove("hidden");
+  $("kiBusy").classList.add("hidden");
+  $("kiDone").classList.add("hidden");
+}
+
+function collectForAi() {
+  var lines = [], missing = [], count = 0;
+  cur.rendered.forEach(function (s) {
+    if (!s.items.length) { missing.push(s.name); return; }
+    s.items.forEach(function (it) {
+      count++;
+      lines.push("• " + s.name + " – " + it.t + (it.s ? ": " + it.s : ""));
+    });
+  });
+  return {lines: lines, missing: missing, count: count};
+}
+
+function aiPrompt(rubrik, coll) {
+  var head = 'Du bist die Zusammenfassungsfunktion der Nachrichtenübersicht "Merricksblatt". ' +
+    'Fasse ausschließlich die folgenden Titel und Inhaltsangaben zusammen – keine eigene Recherche, ' +
+    'keine Bewertung, keine erfundenen Details. Antworte auf Deutsch in genau zwei kompakten Absätzen ' +
+    '(insgesamt etwa 120 bis 180 Wörter): zuerst die politischen, dann die wirtschaftlichen Themen, ' +
+    'inhaltlich gebündelt statt Quelle für Quelle.';
+  if (coll.missing.length) {
+    head += ' Erwähne in einem kurzen Schlusssatz, dass folgende Quellen keine Beiträge lieferten: ' +
+      coll.missing.join(", ") + ".";
+  }
+  return head + "\n\nRubrik: " + rubrik + "\n\nBeiträge:\n" + coll.lines.join("\n");
+}
+
+function callPollinations(prompt) {
+  var body = JSON.stringify({
+    model: "openai", private: true, referrer: "merricksblatt.janrickmer.de",
+    messages: [{role: "user", content: prompt}]
+  });
+  function ok(txt) {
+    txt = (txt || "").trim();
+    if (txt.length < 60 || txt.charAt(0) === "<") throw new Error("unbrauchbare Antwort");
+    return txt;
+  }
+  var getUrl = "https://text.pollinations.ai/" + encodeURIComponent(prompt) +
+    "?model=openai&private=true&referrer=merricksblatt.janrickmer.de";
+  return fetchTimeout("https://text.pollinations.ai/openai",
+      {method:"POST", headers:{"Content-Type":"application/json"}, body: body}, 30000)
+    .then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json().then(function (j) {
+        return ok(j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content);
+      }, function () { return r.text().then(ok); });
+    })
+    .catch(function () {
+      return fetchTimeout(getUrl, {}, 25000)
+        .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.text().then(ok); });
+    })
+    .catch(function () {
+      return fetchTimeout(PROXIES[0](getUrl), {}, 25000)
+        .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.text().then(ok); });
+    });
+}
+
+var DE_STOP = {"der":1,"die":1,"das":1,"und":1,"oder":1,"aber":1,"mit":1,"von":1,"für":1,"auf":1,"des":1,"den":1,"dem":1,"ein":1,"eine":1,"einer":1,"eines":1,"einem":1,"einen":1,"ist":1,"sind":1,"war":1,"wird":1,"werden":1,"nach":1,"über":1,"bei":1,"aus":1,"als":1,"auch":1,"sich":1,"nicht":1,"noch":1,"mehr":1,"sein":1,"seine":1,"ihre":1,"beim":1,"zum":1,"zur":1,"hat":1,"haben":1,"sollen":1,"soll":1,"laut":1,"gegen":1,"unter":1,"vor":1,"seit":1,"bis":1,"dass":1,"wie":1,"ihre":1,"ihren":1,"diese":1,"dieser":1,"dieses":1,"neue":1,"neuen":1,"neuer":1};
+
+function localSummary(coll) {
+  var sentences = [];
+  cur.rendered.forEach(function (s) {
+    s.items.forEach(function (it) {
+      var base = (it.t + ". " + (it.s || "")).replace(/\s+/g, " ");
+      (base.match(/[^.!?]+[.!?]+/g) || [base]).forEach(function (sen) {
+        sen = sen.trim();
+        if (sen.length > 35 && sen.length < 240) sentences.push({txt: sen, src: s.name});
+      });
+    });
+  });
+  var freq = {};
+  sentences.forEach(function (s) {
+    s.txt.toLowerCase().replace(/[^a-zäöüß\- ]/g, " ").split(/\s+/).forEach(function (w) {
+      if (w.length > 3 && !DE_STOP[w]) freq[w] = (freq[w] || 0) + 1;
+    });
+  });
+  sentences.forEach(function (s) {
+    var sc = 0, n = 0;
+    s.txt.toLowerCase().replace(/[^a-zäöüß\- ]/g, " ").split(/\s+/).forEach(function (w) {
+      if (w.length > 3 && !DE_STOP[w]) { sc += (freq[w] || 0); n++; }
+    });
+    s.score = n ? sc / Math.pow(n, 0.6) : 0;
+  });
+  var picked = sentences.slice().sort(function (a, b) { return b.score - a.score; }).slice(0, 7);
+  picked = sentences.filter(function (s) { return picked.indexOf(s) > -1; });   // Originalreihenfolge
+  var seen = {};
+  picked = picked.filter(function (s) { var k = s.txt.slice(0, 60); if (seen[k]) return false; seen[k] = 1; return true; });
+  var half = Math.ceil(picked.length / 2);
+  var p1 = picked.slice(0, half).map(function (s) { return s.txt; }).join(" ");
+  var p2 = picked.slice(half).map(function (s) { return s.txt; }).join(" ");
+  var paras = [p1, p2].filter(Boolean);
+  if (coll.missing.length) paras.push("Ohne Beiträge in dieser Ansicht: " + coll.missing.join(", ") + ".");
+  return paras;
+}
+
+$("kiStart").addEventListener("click", function () {
+  var t = tabDef(cur.tab);
+  var coll = collectForAi();
+  if (!coll.count) return;
+  cur.ai = "busy"; cur.aiCount = coll.count;
+  $("kiIdle").classList.add("hidden");
+  $("kiDone").classList.add("hidden");
+  $("kiBusy").classList.remove("hidden");
+  $("kiBusyLabel").textContent = "Fasst " + coll.count + " angezeigte Beiträge zusammen …";
+  var rubrik = t.label();
+  var tabAtStart = cur.tab;
+
+  callPollinations(aiPrompt(rubrik, coll)).then(function (txt) {
+    return {paras: txt.split(/\n{2,}/).map(function (p) { return p.replace(/\s+/g, " ").trim(); }).filter(Boolean), local: false};
+  }).catch(function () {
+    return {paras: localSummary(coll), local: true};
+  }).then(function (res) {
+    if (cur.tab !== tabAtStart) return;
+    cur.ai = "done"; cur.aiParas = res.paras; cur.aiLocal = res.local;
+    $("kiBusy").classList.add("hidden");
+    var out = $("kiText"); out.textContent = "";
+    res.paras.forEach(function (p) { out.appendChild(el("p", null, p)); });
+    $("kiFoot").textContent = "Erstellt aus " + coll.count + " Titeln und Inhaltsangaben dieser Seite · " + rubrik +
+      (res.local ? " · lokale Kurzfassung, KI-Dienst war nicht erreichbar" : " · Pollinations.AI");
+    $("speakBtn").textContent = "Textzusammenfassung vorlesen";
+    $("kiDone").classList.remove("hidden");
+  });
+});
+
+/* ─────────────────────────── Vorlesen ───────────────────────────────── */
+
+var voiceReady = false;
+function pickVoice() {
+  if (!window.speechSynthesis) return null;
+  var vs = speechSynthesis.getVoices();
+  for (var i = 0; i < vs.length; i++) if (/^de/i.test(vs[i].lang)) return vs[i];
+  return null;
+}
+if (window.speechSynthesis) {
+  speechSynthesis.onvoiceschanged = function () { voiceReady = true; };
+}
+
+function stopSpeak() {
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  cur.speaking = false;
+  $("speakBtn").textContent = "Textzusammenfassung vorlesen";
+  $("speakingNote").classList.add("hidden");
+}
+
+$("speakBtn").addEventListener("click", function () {
+  if (!window.speechSynthesis) {
+    alert("Dieser Browser stellt leider keine Sprachausgabe bereit.");
+    return;
+  }
+  if (cur.speaking) { stopSpeak(); return; }
+  var text = cur.aiParas.join(" ");
+  if (!text) return;
+  speechSynthesis.cancel();
+  var u = new SpeechSynthesisUtterance(text);
+  u.lang = "de-DE";
+  u.rate = 1.35;
+  var v = pickVoice(); if (v) u.voice = v;
+  u.onend = stopSpeak;
+  u.onerror = stopSpeak;
+  cur.speaking = true;
+  $("speakBtn").textContent = "Vorlesen beenden";
+  $("speakingNote").classList.remove("hidden");
+  speechSynthesis.speak(u);
+});
+window.addEventListener("beforeunload", function () {
+  if (window.speechSynthesis) speechSynthesis.cancel();
+});
+
+/* ───────────────────────────── Start ────────────────────────────────── */
+
+initHeader();
+renderTabs();
+initPlz();
+renderRubrik();
+
+setInterval(function () {
+  if (document.hidden) return;
+  var t = tabDef(cur.tab);
+  if (t.file) loadFixed(t, true);
+}, 10 * 60000);
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Atomtest</title>
+<entry><title>Weltbank senkt Prognose für Schwellenländer</title>
+<link href="https://example.org/b1"/>
+<summary>Höhere Zinsen belasten die Nachfrage, heute in Washington vorgestellt.</summary>
+<updated>2026-08-04T06:30:00Z</updated></entry>
+<entry><title>Neubrandenburg testet Wasserstoffbusse</title>
+<link href="https://example.org/b2"/>
+<summary>Mecklenburg-Vorpommern fördert den Regionalverkehr.</summary>
+<updated>2026-08-04T05:45:00Z</updated></entry>
+</feed>
