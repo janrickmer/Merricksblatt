@@ -1,0 +1,52 @@
+# Merricksblatt – Nachrichten-Daten alle 30 Minuten aktualisieren.
+#
+# Was hier passiert: GitHub ruft die RSS-Feeds serverseitig ab (keine
+# CORS-Grenzen, keine Gratis-Proxys), schreibt fertige JSON-Dateien nach
+# data/ und committet sie. Jeder Daten-Commit zählt zugleich als
+# Repository-Aktivität und verhindert damit, dass GitHub den Zeitplan
+# nach 60 Tagen Inaktivität abschaltet.
+#
+# Manuell starten: Reiter "Actions" → "Merricksblatt Feeds" → "Run workflow".
+
+name: Merricksblatt Feeds
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"      # alle 30 Minuten (UTC, ohne Sekundengarantie)
+  workflow_dispatch:             # Knopf für manuelle Läufe
+  push:
+    branches: [main]
+    paths:
+      - "scripts/**"
+      - ".github/workflows/feeds.yml"
+
+permissions:
+  contents: write                # nötig, um data/ zu committen
+
+concurrency:
+  group: merricksblatt-feeds
+  cancel-in-progress: false      # laufenden Abruf nie mittendrin abbrechen
+
+jobs:
+  feeds:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Feeds abrufen und JSON erzeugen
+        run: python3 scripts/fetch_feeds.py
+
+      - name: Daten committen (nur bei Änderungen)
+        run: |
+          git config user.name  "merricksblatt-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "Keine inhaltlichen Änderungen – kein Commit nötig."
+          else
+            git commit -m "Daten: Feeds aktualisiert ($(date -u +'%Y-%m-%d %H:%M UTC'))"
+            git pull --rebase origin main || true
+            git push
+          fi
