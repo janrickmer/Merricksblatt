@@ -38,8 +38,17 @@ button{font-family:inherit}
 .masthead{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:34px 0 22px}
 .brand{font-size:clamp(52px,9vw,104px);line-height:.95;letter-spacing:-.02em;margin:0;color:var(--ink)}
 .slogan{margin:0;font-size:clamp(15px,1.8vw,19px);font-weight:600;color:var(--ink-soft);max-width:680px}
-.plzpill{display:flex;align-items:center;gap:10px;margin-top:6px;padding:7px 16px 7px 13px;border:1px solid var(--line);border-radius:999px;font-size:13px;color:var(--ink-soft)}
+.pillrow{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:10px;margin-top:6px}
+.plzpill{display:flex;align-items:center;gap:10px;padding:7px 16px 7px 13px;border:1px solid var(--line);border-radius:999px;font-size:13px;color:var(--ink-soft)}
 .plzpill b{font-weight:600}
+a.pillbtn{cursor:pointer;text-decoration:none;color:var(--ink-soft)}
+a.pillbtn:hover{background:var(--hover);color:var(--ink);text-decoration:none}
+
+.splash{position:fixed;inset:0;z-index:50;background:#fff;display:grid;place-items:center;text-align:center;opacity:1;transition:opacity .4s ease}
+.splash.out{opacity:0;pointer-events:none}
+.splash h1{font-size:clamp(46px,8vw,92px);line-height:.95;letter-spacing:-.02em;margin:0;color:var(--ink)}
+.splash p{margin:12px 0 0;font-size:clamp(13px,1.6vw,16px);color:var(--muted)}
+@media (prefers-reduced-motion: reduce){.splash{transition:none}}
 .linkbtn{border:0;background:transparent;padding:0;margin-left:2px;font-family:inherit;font-size:12px;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 .linkbtn:hover{color:var(--accent-dark)}
 
@@ -129,6 +138,12 @@ button{font-family:inherit}
 </style>
 </head>
 <body>
+<div class="splash" id="splash" aria-hidden="true">
+  <div>
+    <h1>Merricksblatt</h1>
+    <p>made by Jan-Rickmer Feindt</p>
+  </div>
+</div>
 <div class="page"><div class="wrap">
 
   <div class="topbar">
@@ -140,10 +155,16 @@ button{font-family:inherit}
   <header class="masthead">
     <h1 class="brand">Merricksblatt</h1>
     <p class="slogan">Mit MERRICK mehr Blick für die aktuellsten News!</p>
-    <div class="plzpill">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#b2622d" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-      <b id="plzLabel">wird ermittelt …</b>
-      <button type="button" class="linkbtn" id="plzChange">ändern</button>
+    <div class="pillrow">
+      <div class="plzpill">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#b2622d" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+        <b id="plzLabel">wird ermittelt …</b>
+        <button type="button" class="linkbtn" id="plzChange">ändern</button>
+      </div>
+      <a class="plzpill pillbtn" href="https://merricks-globus.janrickmer.de/" target="_blank" rel="noopener">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#b2622d" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 0 20a15.3 15.3 0 0 1 0-20Z"></path></svg>
+        <b>Merricks Globus</b>
+      </a>
     </div>
   </header>
 
@@ -819,9 +840,11 @@ function collectForAi() {
 function aiPrompt(rubrik, coll) {
   var head = 'Du bist die Zusammenfassungsfunktion der Nachrichtenübersicht "Merricksblatt". ' +
     'Fasse ausschließlich die folgenden Titel und Inhaltsangaben zusammen – keine eigene Recherche, ' +
-    'keine Bewertung, keine erfundenen Details. Antworte auf Deutsch in genau zwei kompakten Absätzen ' +
-    '(insgesamt etwa 120 bis 180 Wörter): zuerst die politischen, dann die wirtschaftlichen Themen, ' +
-    'inhaltlich gebündelt statt Quelle für Quelle.';
+    'keine Bewertung, keine erfundenen Details. Schreibe auf Deutsch einen in sich geschlossenen, ' +
+    'klar strukturierten Fließtext von 60 bis 100 Wörtern: beginne mit den wichtigsten politischen ' +
+    'Entwicklungen, gehe dann zu den wirtschaftlichen Themen über und verbinde verwandte Meldungen ' +
+    'mit Übergängen zu einem roten Faden, statt sie aufzuzählen. Keine Aufzählungszeichen, keine ' +
+    'Überschriften, keine Quellenliste.';
   if (coll.missing.length) {
     head += ' Erwähne in einem kurzen Schlusssatz, dass folgende Quellen keine Beiträge lieferten: ' +
       coll.missing.join(", ") + ".";
@@ -868,10 +891,31 @@ function localSummary(coll) {
       var base = (it.t + ". " + (it.s || "")).replace(/\s+/g, " ");
       (base.match(/[^.!?]+[.!?]+/g) || [base]).forEach(function (sen) {
         sen = sen.trim();
-        if (sen.length > 35 && sen.length < 240) sentences.push({txt: sen, src: s.name});
+        if (sen.length > 25 && sen.length < 240 &&
+            sen.indexOf("Titel anklicken") < 0 && sen.indexOf("Meldung bei ") !== 0) {
+          sentences.push({txt: sen, src: s.name});
+        }
       });
     });
   });
+  if (!sentences.length) {
+    // Sehr dünnes Material (z. B. nur Trefferlisten): Titel-Überblick im Wortbudget
+    var seenT = {}, buf = [], w2 = 0;
+    cur.rendered.forEach(function (s) {
+      s.items.forEach(function (it) {
+        var tt = (it.t || "").trim();
+        var key = tt.replace(/[.!?]+$/, "");
+        if (!key || seenT[key]) return;
+        tt = /[.!?]$/.test(tt) ? tt : tt + ".";
+        var ww = tt.split(/\s+/).length;
+        if (w2 + ww > 100) return;
+        seenT[key] = 1; buf.push(tt); w2 += ww;
+      });
+    });
+    var paras0 = buf.length ? ["Im Überblick: " + buf.join(" ")] : [];
+    if (coll.missing.length) paras0.push("Ohne Beiträge in dieser Ansicht: " + coll.missing.join(", ") + ".");
+    return paras0.length ? paras0 : ["Zurzeit liegen keine zusammenfassbaren Beiträge vor."];
+  }
   var freq = {};
   sentences.forEach(function (s) {
     s.txt.toLowerCase().replace(/[^a-zäöüß\- ]/g, " ").split(/\s+/).forEach(function (w) {
@@ -885,14 +929,22 @@ function localSummary(coll) {
     });
     s.score = n ? sc / Math.pow(n, 0.6) : 0;
   });
-  var picked = sentences.slice().sort(function (a, b) { return b.score - a.score; }).slice(0, 7);
-  picked = sentences.filter(function (s) { return picked.indexOf(s) > -1; });   // Originalreihenfolge
-  var seen = {};
-  picked = picked.filter(function (s) { var k = s.txt.slice(0, 60); if (seen[k]) return false; seen[k] = 1; return true; });
-  var half = Math.ceil(picked.length / 2);
-  var p1 = picked.slice(0, half).map(function (s) { return s.txt; }).join(" ");
-  var p2 = picked.slice(half).map(function (s) { return s.txt; }).join(" ");
-  var paras = [p1, p2].filter(Boolean);
+  var ranked = sentences.slice().sort(function (a, b) { return b.score - a.score; });
+  var seen = {}, chosen = [], words = 0;
+  for (var i = 0; i < ranked.length; i++) {
+    var cnd = ranked[i], k = cnd.txt.slice(0, 60);
+    if (seen[k]) continue;
+    var w = cnd.txt.split(/\s+/).length;
+    if (words + w > 100) {                 // Budget 60–100 Wörter einhalten
+      if (words >= 60) break;              // genug beisammen → aufhören
+      continue;                            // sonst kürzere Sätze weiter probieren
+    }
+    seen[k] = 1; chosen.push(cnd); words += w;
+    if (words >= 100) break;
+  }
+  if (!chosen.length && ranked.length) chosen.push(ranked[0]);
+  chosen = sentences.filter(function (s) { return chosen.indexOf(s) > -1; });   // Originalreihenfolge
+  var paras = [chosen.map(function (s) { return s.txt; }).join(" ")];
   if (coll.missing.length) paras.push("Ohne Beiträge in dieser Ansicht: " + coll.missing.join(", ") + ".");
   return paras;
 }
@@ -976,6 +1028,15 @@ initHeader();
 renderTabs();
 initPlz();
 renderRubrik();
+
+(function () {
+  var splash = $("splash");
+  if (!splash) return;
+  setTimeout(function () { splash.classList.add("out"); }, 2000);
+  setTimeout(function () {
+    if (splash.parentNode) splash.parentNode.removeChild(splash);
+  }, 2500);
+})();
 
 setInterval(function () {
   if (document.hidden) return;
