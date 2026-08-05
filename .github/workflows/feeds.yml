@@ -22,7 +22,6 @@ on:
 
 permissions:
   contents: write                # nötig, um data/ zu committen
-  models: read                   # erlaubt kostenlose GitHub-Models-Aufrufe (KI-Zusammenfassung)
 
 concurrency:
   group: merricksblatt-feeds
@@ -31,14 +30,18 @@ concurrency:
 jobs:
   feeds:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Repository auschecken
         uses: actions/checkout@v4
 
       - name: Feeds abrufen, JSON und KI-Zusammenfassungen erzeugen
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          # Optional: kostenlose Cloudflare-Workers-AI-Härtung. Solange diese
+          # Secrets nicht existieren, bleiben die Variablen leer und der Lauf
+          # nutzt automatisch Pollinations.
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
         run: python3 scripts/fetch_feeds.py
 
       - name: Daten committen (nur bei Änderungen)
