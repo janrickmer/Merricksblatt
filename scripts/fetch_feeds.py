@@ -38,17 +38,23 @@ TIMEOUT = 25
 MAX_ITEMS = 15          # je Quelle und Rubrik gespeicherte Beiträge
 SUMMARY_MAX = 320       # Zeichenobergrenze der Inhaltsangabe (RSS-Teaser)
 
-# ---- KI-Zusammenfassungen über GitHub Models (kostenlos, per GITHUB_TOKEN) --
-# Der Workflow gibt dem Token die Berechtigung "models: read"; damit darf
-# dieser Lauf GitHubs eigene Modelle aufrufen. Die Gratis-Kontingente sind
-# knapp, deshalb werden Zusammenfassungen nicht bei jedem Halbstundenlauf
-# erneuert, sondern altersgesteuert (Hauptrubriken ~2 h, Länder ~6 h).
-GH_MODELS_URL = "https://models.github.ai/inference/chat/completions"
-GH_MODELS = ["openai/gpt-4o-mini", "openai/gpt-4.1-mini"]   # Haupt- und Ausweichmodell
+# ---- KI-Zusammenfassungen serverseitig im Datenlauf ------------------------
+# GitHub Models wurde zum 30.07.2026 vollständig abgeschaltet (HTTP 410).
+# Ersatzweg: Der Runner ruft Pollinations.AI auf – serverseitig, im
+# Anfragekörper (keine Adresslängen-Grenze) und bewusst langsam getaktet,
+# damit die Anonym-Drossel (~1 Anfrage / 15 s) nie greift. Scheitert ein
+# Aufruf, bleibt die letzte Fassung erhalten; die Seite hat zudem ihre
+# lokale Ersatzfassung. Optionale Härtung ohne Code-Änderung: Liegen die
+# Repository-Secrets CF_ACCOUNT_ID und CF_API_TOKEN vor (kostenloses
+# Cloudflare-Konto, Workers AI: 10.000 Neurons/Tag gratis mit harter
+# Abschaltung), nutzt der Lauf zuerst Cloudflare und Pollinations nur
+# noch als Rückfalle.
+POLLI_URL = "https://text.pollinations.ai/openai"
+POLLI_PAUSE = 16        # Sekunden zwischen Pollinations-Aufrufen (Drossel-Takt)
+CF_MODEL_DEFAULT = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 SUM_MAIN_MIN = 110      # Minuten: Globales/Europa/Deutschland neu nach ~2 Stunden
-SUM_LAND_MIN = 350      # Minuten: Bundesländer neu nach ~6 Stunden
-SUM_MAX_CALLS = 22      # harte Obergrenze an Modell-Aufrufen je Lauf
-SUM_PAUSE = 4           # Sekunden Pause zwischen Aufrufen (Minutenlimit schonen)
+SUM_LAND_MIN = 350      # Minuten: Bundesländer/Kommune neu nach ~6 Stunden
+SUM_MAX_CALLS = 24      # harte Obergrenze an KI-Aufrufen je Lauf
 
 # ---------------------------------------------------------------- Medien ---
 
@@ -404,50 +410,102 @@ def sum_prompt(rubrik, sources):
 
 _sum_state = {"calls": 0, "blocked": False}
 
-def gh_summarize(rubrik, sources):
-    """Rückgabe: (text|None, basis, status)."""
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-    if not token:
-        return None, 0, "übersprungen: kein GITHUB_TOKEN"
+def _post_json(url, payload, headers, timeout=90):
+    req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"),
+                                 headers=headers, method="POST")
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read().decode("utf-8", "replace")
+
+def _extract_text(raw):
+    """OpenAI-Format, Cloudflare-Format oder blanker Text."""
+    try:
+        j = json.loads(raw)
+    except Exception:
+        return raw.strip()
+    if isinstance(j, dict):
+        ch = j.get("choices")
+        if ch:
+            return ((ch[0].get("message") or {}).get("content") or "").strip()
+        res = j.get("result")
+        if isinstance(res, dict):
+            return (res.get("response") or "").strip()
+    return ""
+
+def _cf_call(prompt):
+    acc = (os.environ.get("CF_ACCOUNT_ID") or "").strip()
+    tok = (os.environ.get("CF_API_TOKEN") or "").strip()
+    if not acc or not tok:
+        return None, "nicht konfiguriert"
+    model = (os.environ.get("CF_AI_MODEL") or CF_MODEL_DEFAULT).strip()
+    url = f"https://api.cloudflare.com/client/v4/accounts/{acc}/ai/run/{model}"
+    try:
+        raw = _post_json(url, {"messages": [{"role": "user", "content": prompt}],
+                               "max_tokens": 300, "temperature": 0.4},
+                         {"Authorization": "Bearer " + tok,
+                          "Content-Type": "application/json", "User-Agent": UA})
+        time.sleep(2)
+        txt = _extract_text(raw)
+        return (txt, "ok") if len(txt) > 40 else (None, "leere Antwort")
+    except urllib.error.HTTPError as e:
+        return None, "HTTP %s" % e.code
+    except Exception as e:
+        return None, type(e).__name__
+
+def _polli_call(prompt):
+    try:
+        raw = _post_json(POLLI_URL, {"model": "openai", "private": True,
+                                     "referrer": "merricksblatt.janrickmer.de",
+                                     "messages": [{"role": "user", "content": prompt}]},
+                         {"Content-Type": "application/json", "User-Agent": UA})
+        time.sleep(POLLI_PAUSE)
+        txt = _extract_text(raw)
+        if len(txt) > 40 and not txt.lstrip().startswith("<"):
+            return txt, "ok"
+        return None, "leere/unbrauchbare Antwort"
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            time.sleep(30)                       # Drossel beruhigen, einmal nachfassen
+            try:
+                raw = _post_json(POLLI_URL, {"model": "openai", "private": True,
+                                             "referrer": "merricksblatt.janrickmer.de",
+                                             "messages": [{"role": "user", "content": prompt}]},
+                                 {"Content-Type": "application/json", "User-Agent": UA})
+                time.sleep(POLLI_PAUSE)
+                txt = _extract_text(raw)
+                if len(txt) > 40 and not txt.lstrip().startswith("<"):
+                    return txt, "ok"
+            except Exception:
+                pass
+        return None, "HTTP %s" % e.code
+    except Exception as e:
+        time.sleep(POLLI_PAUSE)
+        return None, type(e).__name__
+
+def ai_summarize(rubrik, sources):
+    """Rückgabe: (text|None, basis, via, status)."""
+    if os.environ.get("GITHUB_ACTIONS") != "true" and os.environ.get("MB_KI") != "1":
+        return None, 0, None, "übersprungen: läuft nicht in GitHub Actions"
     if _sum_state["blocked"]:
-        return None, 0, "übersprungen: Kontingent/Drossel in diesem Lauf"
+        return None, 0, None, "übersprungen: KI-Wege in diesem Lauf erschöpft"
     if _sum_state["calls"] >= SUM_MAX_CALLS:
-        return None, 0, "übersprungen: Obergrenze je Lauf erreicht"
+        return None, 0, None, "übersprungen: Obergrenze je Lauf erreicht"
     prompt, count = sum_prompt(rubrik, sources)
     if count == 0:
-        return None, 0, "übersprungen: keine Beiträge"
-    last = "?"
-    for model in GH_MODELS:
-        _sum_state["calls"] += 1
-        try:
-            req = urllib.request.Request(GH_MODELS_URL, data=json.dumps({
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.4,
-                "max_tokens": 300,
-            }).encode("utf-8"), headers={
-                "Authorization": "Bearer " + token,
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "User-Agent": UA,
-            }, method="POST")
-            with urllib.request.urlopen(req, timeout=60) as r:
-                j = json.loads(r.read().decode("utf-8"))
-            time.sleep(SUM_PAUSE)
-            txt = ((j.get("choices") or [{}])[0].get("message") or {}).get("content", "").strip()
-            if len(txt) > 40:
-                return txt, count, "ok (" + model + ")"
-            last = "leere Antwort (" + model + ")"
-        except urllib.error.HTTPError as e:
-            last = "HTTP %s (%s)" % (e.code, model)
-            if e.code == 429:                      # Kontingent erschöpft → Rest des Laufs auslassen
-                _sum_state["blocked"] = True
-                return None, 0, "Kontingent/Drossel: HTTP 429"
-            time.sleep(SUM_PAUSE)
-        except Exception as e:
-            last = type(e).__name__ + " (" + model + ")"
-            time.sleep(SUM_PAUSE)
-    return None, 0, "fehlgeschlagen: " + last
+        return None, 0, None, "übersprungen: keine Beiträge"
+
+    _sum_state["calls"] += 1
+    txt, st_cf = _cf_call(prompt)
+    if txt:
+        return txt, count, "Cloudflare Workers AI", "ok (Cloudflare Workers AI)"
+
+    _sum_state["calls"] += 1
+    txt, st_po = _polli_call(prompt)
+    if txt:
+        return txt, count, "Pollinations.AI", "ok (Pollinations)"
+
+    if st_po.startswith("HTTP 4") and st_po != "HTTP 429":
+        _sum_state["blocked"] = True             # harter Fehler → Lauf nicht weiter belasten
+    return None, 0, None, f"fehlgeschlagen: Cloudflare {st_cf} / Pollinations {st_po}"
 
 def sum_due(prev, minutes, now):
     ki = (prev or {}).get("ki") or {}
@@ -571,9 +629,9 @@ def main():
                    "sources": sources}
         prev_ki = (prev or {}).get("ki")
         if sum_due(prev, SUM_LAND_MIN, now):
-            txt, basis, st = gh_summarize(KOMMUNE_ORT, sources)
+            txt, basis, via, st = ai_summarize(KOMMUNE_ORT, sources)
             if txt:
-                payload["ki"] = {"text": txt, "generated": iso(now), "basis": basis}
+                payload["ki"] = {"text": txt, "generated": iso(now), "basis": basis, "via": via}
             elif prev_ki:
                 payload["ki"] = prev_ki
             ki_status[fn] = st
@@ -597,9 +655,9 @@ def main():
         payload = {"updated": iso(now), "rubrik": rubrik_name, "sources": sources}
         prev_ki = (prev or {}).get("ki")
         if sum_due(prev, sum_minutes, now):
-            txt, basis, st = gh_summarize(rubrik_name, sources)
+            txt, basis, via, st = ai_summarize(rubrik_name, sources)
             if txt:
-                payload["ki"] = {"text": txt, "generated": iso(now), "basis": basis}
+                payload["ki"] = {"text": txt, "generated": iso(now), "basis": basis, "via": via}
             elif prev_ki:
                 payload["ki"] = prev_ki           # alte Fassung behalten statt Lücke
             ki_status[fn] = st
@@ -628,7 +686,7 @@ def main():
     made = sum(1 for v in ki_status.values() if v.startswith("ok"))
     print(f"[Merricksblatt] KI-Zusammenfassungen: {made} neu erzeugt, "
           f"{sum(1 for v in ki_status.values() if v.startswith('aktuell'))} noch aktuell, "
-          f"{_sum_state['calls']} Modell-Aufrufe")
+          f"{_sum_state['calls']} KI-Aufrufe")
     for fn, st in sorted(ki_status.items()):
         if not (st.startswith("ok") or st.startswith("aktuell")):
             print(f"  KI-HINWEIS  {fn}  →  {st}")
