@@ -22,6 +22,7 @@ on:
 
 permissions:
   contents: write                # nötig, um data/ zu committen
+  models: read                   # erlaubt kostenlose GitHub-Models-Aufrufe (KI-Zusammenfassung)
 
 concurrency:
   group: merricksblatt-feeds
@@ -35,7 +36,9 @@ jobs:
       - name: Repository auschecken
         uses: actions/checkout@v4
 
-      - name: Feeds abrufen und JSON erzeugen
+      - name: Feeds abrufen, JSON und KI-Zusammenfassungen erzeugen
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: python3 scripts/fetch_feeds.py
 
       - name: Daten committen (nur bei Änderungen)
