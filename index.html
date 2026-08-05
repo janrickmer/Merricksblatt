@@ -213,7 +213,7 @@ a.pillbtn:hover{background:var(--hover);color:var(--ink);text-decoration:none}
   <footer class="foot">
     <span>Merricksblatt · Übersicht fremder Inhalte, alle Rechte bei den verlinkten Medien</span>
     <span>Standort: <span id="plzFoot">–</span></span>
-    <span class="credits">PLZ-Zuordnung: GeoNames-Daten via zauberware (CC BY 4.0) · Nachrichtendaten: RSS-Feeds der Verlage &amp; Google News, halbstündlich über GitHub Actions aktualisiert · KI-Zusammenfassung: GitHub Models (im Datenlauf vorbereitet); bei „Kommunales" Pollinations.AI mit lokaler Ersatzfassung · Vorlesen: Sprachausgabe des Browsers</span>
+    <span class="credits">PLZ-Zuordnung: GeoNames-Daten via zauberware (CC BY 4.0) · Nachrichtendaten: RSS-Feeds der Verlage &amp; Google News, halbstündlich über GitHub Actions aktualisiert · KI-Zusammenfassung: im Datenlauf vorbereitet (Anbieter steht in der Fußnote der Zusammenfassung); bei „Kommunales" mit anderer PLZ Live-Versuch plus lokale Ersatzfassung · Vorlesen: Sprachausgabe des Browsers</span>
   </footer>
 
 </div>
@@ -986,7 +986,7 @@ $("kiStart").addEventListener("click", function () {
       cur.aiLocal = false;
       cur.aiParas = splitParas(ki.text);
       renderAiResult("Erstellt aus " + (ki.basis || "den") + " Beiträgen (jeweils die ersten drei je Quelle) · " +
-        rubrik + " · GitHub Models · Stand " + stamp(ki.generated));
+        rubrik + " · " + (ki.via || "KI") + " · Stand " + stamp(ki.generated));
     } else {
       var coll0 = collectForAi();
       if (!coll0.count) { resetAi(); return; }
