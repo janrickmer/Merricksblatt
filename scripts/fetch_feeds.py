@@ -25,6 +25,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -36,6 +37,18 @@ UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, wie Gecko) "
 TIMEOUT = 25
 MAX_ITEMS = 15          # je Quelle und Rubrik gespeicherte Beiträge
 SUMMARY_MAX = 320       # Zeichenobergrenze der Inhaltsangabe (RSS-Teaser)
+
+# ---- KI-Zusammenfassungen über GitHub Models (kostenlos, per GITHUB_TOKEN) --
+# Der Workflow gibt dem Token die Berechtigung "models: read"; damit darf
+# dieser Lauf GitHubs eigene Modelle aufrufen. Die Gratis-Kontingente sind
+# knapp, deshalb werden Zusammenfassungen nicht bei jedem Halbstundenlauf
+# erneuert, sondern altersgesteuert (Hauptrubriken ~2 h, Länder ~6 h).
+GH_MODELS_URL = "https://models.github.ai/inference/chat/completions"
+GH_MODELS = ["openai/gpt-4o-mini", "openai/gpt-4.1-mini"]   # Haupt- und Ausweichmodell
+SUM_MAIN_MIN = 110      # Minuten: Globales/Europa/Deutschland neu nach ~2 Stunden
+SUM_LAND_MIN = 350      # Minuten: Bundesländer neu nach ~6 Stunden
+SUM_MAX_CALLS = 22      # harte Obergrenze an Modell-Aufrufen je Lauf
+SUM_PAUSE = 4           # Sekunden Pause zwischen Aufrufen (Minutenlimit schonen)
 
 # ---------------------------------------------------------------- Medien ---
 
@@ -298,6 +311,30 @@ def gn_land(code):
     name = LAENDER[code][0]
     return gn_url(f'"{name}" (Landtag OR Landesregierung OR Landespolitik OR Wirtschaft)', "2d")
 
+# ------------------------------------------------ Vorgeladene Kommune ------
+# Die Kommunal-Rubrik ist grundsätzlich besucherabhängig (PLZ erst im Browser
+# bekannt). Für die mit Abstand wahrscheinlichste PLZ wird sie hier trotzdem
+# wie eine feste Rubrik vorberechnet; alle anderen PLZ laden weiterhin live.
+KOMMUNE_PLZ = "34132"
+KOMMUNE_ORT = "Kassel"
+
+DOMAINS = {"ts": "tagesschau.de", "faz": "faz.net", "sz": "sueddeutsche.de",
+           "zeit": "zeit.de", "spiegel": "spiegel.de", "hb": "handelsblatt.com",
+           "taz": "taz.de"}
+
+def kommune_queries():
+    """(Quell-ID, Suchtext, Zeitfenster) – identisch zu den Live-Anfragen der Seite."""
+    q = [("gn", f'"{KOMMUNE_ORT}" Kommunalpolitik OR Stadtrat OR Gemeinderat OR Rathaus', "7d")]
+    for sid in ORDER:
+        if sid == "gn":
+            continue
+        q.append((sid, f'"{KOMMUNE_ORT}" site:{DOMAINS[sid]}', "14d"))
+    return q
+
+def gn_search_url(query, when):
+    qq = urllib.parse.quote(f"{query} when:{when}")
+    return f"https://news.google.com/search?q={qq}&hl=de&gl=DE&ceid=DE%3Ade"
+
 # ------------------------------------------------------------- Sortieren ---
 
 def dedupe(items):
@@ -340,6 +377,90 @@ def build_rubrics(pool):
     return rub
 
 # ------------------------------------------------------------- Ausgabe -----
+
+def sum_prompt(rubrik, sources):
+    """Material = die jeweils ersten drei Beiträge je Quelle (Erstansicht)."""
+    lines, missing, count = [], [], 0
+    for s in sources:
+        items = s.get("items") or []
+        if not items:
+            missing.append(s["name"])
+            continue
+        for it in items[:3]:
+            count += 1
+            txt = (it.get("s") or "")[:200]
+            lines.append("• " + s["name"] + " – " + it["t"] + ((": " + txt) if txt else ""))
+    head = ('Du bist die Zusammenfassungsfunktion der Nachrichtenübersicht "Merricksblatt". '
+            'Fasse ausschließlich die folgenden Titel und Inhaltsangaben zusammen – keine eigene '
+            'Recherche, keine Bewertung, keine erfundenen Details. Schreibe auf Deutsch einen in '
+            'sich geschlossenen, klar strukturierten Fließtext von 60 bis 100 Wörtern: beginne mit '
+            'den wichtigsten politischen Entwicklungen, gehe dann zu den wirtschaftlichen Themen '
+            'über und verbinde verwandte Meldungen mit Übergängen zu einem roten Faden, statt sie '
+            'aufzuzählen. Keine Aufzählungszeichen, keine Überschriften, keine Quellenliste.')
+    if missing:
+        head += (' Erwähne in einem kurzen Schlusssatz, dass folgende Quellen keine Beiträge '
+                 'lieferten: ' + ", ".join(missing) + '.')
+    return head + "\n\nRubrik: " + rubrik + "\n\nBeiträge:\n" + "\n".join(lines), count
+
+_sum_state = {"calls": 0, "blocked": False}
+
+def gh_summarize(rubrik, sources):
+    """Rückgabe: (text|None, basis, status)."""
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if not token:
+        return None, 0, "übersprungen: kein GITHUB_TOKEN"
+    if _sum_state["blocked"]:
+        return None, 0, "übersprungen: Kontingent/Drossel in diesem Lauf"
+    if _sum_state["calls"] >= SUM_MAX_CALLS:
+        return None, 0, "übersprungen: Obergrenze je Lauf erreicht"
+    prompt, count = sum_prompt(rubrik, sources)
+    if count == 0:
+        return None, 0, "übersprungen: keine Beiträge"
+    last = "?"
+    for model in GH_MODELS:
+        _sum_state["calls"] += 1
+        try:
+            req = urllib.request.Request(GH_MODELS_URL, data=json.dumps({
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.4,
+                "max_tokens": 300,
+            }).encode("utf-8"), headers={
+                "Authorization": "Bearer " + token,
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": UA,
+            }, method="POST")
+            with urllib.request.urlopen(req, timeout=60) as r:
+                j = json.loads(r.read().decode("utf-8"))
+            time.sleep(SUM_PAUSE)
+            txt = ((j.get("choices") or [{}])[0].get("message") or {}).get("content", "").strip()
+            if len(txt) > 40:
+                return txt, count, "ok (" + model + ")"
+            last = "leere Antwort (" + model + ")"
+        except urllib.error.HTTPError as e:
+            last = "HTTP %s (%s)" % (e.code, model)
+            if e.code == 429:                      # Kontingent erschöpft → Rest des Laufs auslassen
+                _sum_state["blocked"] = True
+                return None, 0, "Kontingent/Drossel: HTTP 429"
+            time.sleep(SUM_PAUSE)
+        except Exception as e:
+            last = type(e).__name__ + " (" + model + ")"
+            time.sleep(SUM_PAUSE)
+    return None, 0, "fehlgeschlagen: " + last
+
+def sum_due(prev, minutes, now):
+    ki = (prev or {}).get("ki") or {}
+    g = ki.get("generated")
+    if not g:
+        return True
+    try:
+        d = dt.datetime.fromisoformat(g)
+    except Exception:
+        return True
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=dt.timezone.utc)
+    return (now - d) >= dt.timedelta(minutes=minutes)
 
 def iso(d):
     return d.isoformat(timespec="seconds") if d else None
@@ -386,6 +507,8 @@ def main():
         jobs.append(("gn", rk, "mix", url))
     for code in LAENDER:
         jobs.append(("gnland", code, "mix", gn_land(code)))
+    for sid, q, when in kommune_queries():
+        jobs.append(("kommune", sid, "mix", gn_url(q, when)))
 
     results = {}
     with cf.ThreadPoolExecutor(max_workers=8) as ex:
@@ -415,13 +538,54 @@ def main():
     # Google-News-Kästen
     gn_items = {rk: [] for rk in GN_QUERIES}
     gn_land_items = {code: [] for code in LAENDER}
+    kommune_items, kommune_ok = {}, {}
     for (kind, key, url), (_, items) in results.items():
         if kind == "gn":
             gn_items[key] = newest(dedupe(items))
         elif kind == "gnland":
             gn_land_items[key] = newest(dedupe(items))
+        elif kind == "kommune":
+            kommune_items[key] = newest(dedupe(items))
+            kommune_ok[key] = status[url].startswith("ok")
 
-    def write_rubric(fn, rubrik_name, per_media, gn_list, gn_ok):
+    def write_kommune(fn):
+        prev = load_previous(fn)
+        sources = []
+        for sid, q, when in kommune_queries():
+            name, home = MEDIA[sid]
+            block = {"id": sid, "name": name, "home": home,
+                     "search": gn_search_url(q, when), "stale": False,
+                     "items": [{"t": i["t"], "s": i["s"], "u": i["u"], "d": iso(i["d"])}
+                               for i in kommune_items.get(sid, [])]}
+            if sid == "gn":
+                block["kicker"] = "Aggregiert · zuerst geladen"
+            if not block["items"] and not kommune_ok.get(sid, False):
+                old = None
+                if prev:
+                    old = next((s for s in prev.get("sources", []) if s.get("id") == sid), None)
+                if old and old.get("items") and not old.get("err"):
+                    block["items"] = old["items"]
+                    block["stale"] = True
+            sources.append(block)
+        payload = {"updated": iso(now), "rubrik": KOMMUNE_ORT, "plz": KOMMUNE_PLZ,
+                   "sources": sources}
+        prev_ki = (prev or {}).get("ki")
+        if sum_due(prev, SUM_LAND_MIN, now):
+            txt, basis, st = gh_summarize(KOMMUNE_ORT, sources)
+            if txt:
+                payload["ki"] = {"text": txt, "generated": iso(now), "basis": basis}
+            elif prev_ki:
+                payload["ki"] = prev_ki
+            ki_status[fn] = st
+        else:
+            if prev_ki:
+                payload["ki"] = prev_ki
+            ki_status[fn] = "aktuell (kein Neuaufbau fällig)"
+        write_json(fn, payload)
+
+    ki_status = {}
+
+    def write_rubric(fn, rubrik_name, per_media, gn_list, gn_ok, sum_minutes):
         prev = load_previous(fn)
         sources = []
         for mkey in ORDER:
@@ -430,22 +594,44 @@ def main():
             else:
                 items = per_media.get(mkey, [])
                 sources.append(source_block(mkey, items, ok_media[mkey], prev))
-        write_json(fn, {"updated": iso(now), "rubrik": rubrik_name, "sources": sources})
+        payload = {"updated": iso(now), "rubrik": rubrik_name, "sources": sources}
+        prev_ki = (prev or {}).get("ki")
+        if sum_due(prev, sum_minutes, now):
+            txt, basis, st = gh_summarize(rubrik_name, sources)
+            if txt:
+                payload["ki"] = {"text": txt, "generated": iso(now), "basis": basis}
+            elif prev_ki:
+                payload["ki"] = prev_ki           # alte Fassung behalten statt Lücke
+            ki_status[fn] = st
+        else:
+            if prev_ki:
+                payload["ki"] = prev_ki
+            ki_status[fn] = "aktuell (kein Neuaufbau fällig)"
+        write_json(fn, payload)
 
     write_rubric("global.json", "Globales", rubrics["global"],
-                 gn_items["global"], bool(gn_items["global"]))
+                 gn_items["global"], bool(gn_items["global"]), SUM_MAIN_MIN)
     write_rubric("europa.json", "Europa", rubrics["europa"],
-                 gn_items["europa"], bool(gn_items["europa"]))
+                 gn_items["europa"], bool(gn_items["europa"]), SUM_MAIN_MIN)
     write_rubric("deutschland.json", "Deutschland", rubrics["deutschland"],
-                 gn_items["deutschland"], bool(gn_items["deutschland"]))
+                 gn_items["deutschland"], bool(gn_items["deutschland"]), SUM_MAIN_MIN)
     for code, (name, _, _) in LAENDER.items():
         write_rubric(f"land-{code.lower()}.json", name, rubrics["land-" + code],
-                     gn_land_items[code], bool(gn_land_items[code]))
+                     gn_land_items[code], bool(gn_land_items[code]), SUM_LAND_MIN)
+    write_kommune(f"kommune-{KOMMUNE_PLZ}.json")
 
-    write_json("meta.json", {"generated": iso(now), "feeds": status})
+    write_json("meta.json", {"generated": iso(now), "feeds": status,
+                             "ki_zusammenfassungen": ki_status})
 
     ok = sum(1 for v in status.values() if v.startswith("ok"))
     print(f"[Merricksblatt] {ok}/{len(status)} Abrufe erfolgreich – {iso(now)}")
+    made = sum(1 for v in ki_status.values() if v.startswith("ok"))
+    print(f"[Merricksblatt] KI-Zusammenfassungen: {made} neu erzeugt, "
+          f"{sum(1 for v in ki_status.values() if v.startswith('aktuell'))} noch aktuell, "
+          f"{_sum_state['calls']} Modell-Aufrufe")
+    for fn, st in sorted(ki_status.items()):
+        if not (st.startswith("ok") or st.startswith("aktuell")):
+            print(f"  KI-HINWEIS  {fn}  →  {st}")
     for url, st in sorted(status.items()):
         if not st.startswith("ok"):
             print(f"  FEHLER  {url}  →  {st}")
