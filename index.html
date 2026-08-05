@@ -188,7 +188,7 @@ a.pillbtn:hover{background:var(--hover);color:var(--ink);text-decoration:none}
   <section class="ki" id="kiBox">
     <p class="kick">Merrick KI · kein redaktioneller Beitrag</p>
     <h3>Zusammenfassung dieser Seite</h3>
-    <p class="desc">Fasst ausschließlich die oben angezeigten Titel und Inhaltsangaben zusammen. Keine eigene Recherche, keine Bewertung.</p>
+    <p class="desc">Fasst die Titel und Inhaltsangaben dieser Seite zusammen – bei den festen Rubriken vorbereitet aus den jeweils ersten drei Beiträgen je Quelle. Keine eigene Recherche, keine Bewertung.</p>
 
     <div id="kiIdle">
       <button type="button" class="kibtn" id="kiStart">KI-Zusammenfassung aller angezeigten Informationen erstellen</button>
@@ -213,7 +213,7 @@ a.pillbtn:hover{background:var(--hover);color:var(--ink);text-decoration:none}
   <footer class="foot">
     <span>Merricksblatt · Übersicht fremder Inhalte, alle Rechte bei den verlinkten Medien</span>
     <span>Standort: <span id="plzFoot">–</span></span>
-    <span class="credits">PLZ-Zuordnung: GeoNames-Daten via zauberware (CC BY 4.0) · Nachrichtendaten: RSS-Feeds der Verlage &amp; Google News, halbstündlich über GitHub Actions aktualisiert · KI-Zusammenfassung: Pollinations.AI (mit lokaler Ersatzfassung) · Vorlesen: Sprachausgabe des Browsers</span>
+    <span class="credits">PLZ-Zuordnung: GeoNames-Daten via zauberware (CC BY 4.0) · Nachrichtendaten: RSS-Feeds der Verlage &amp; Google News, halbstündlich über GitHub Actions aktualisiert · KI-Zusammenfassung: GitHub Models (im Datenlauf vorbereitet); bei „Kommunales" Pollinations.AI mit lokaler Ersatzfassung · Vorlesen: Sprachausgabe des Browsers</span>
   </footer>
 
 </div>
@@ -338,7 +338,8 @@ var TABS = [
     meta:"Landespolitik & Wirtschaft",
     gnQ:function(){return '"' + landName() + '" Landespolitik OR Landtag OR ' + (CAPITALS[cur.place.land] || "") + " when:2d";},
     gnFilter:function(){return landName() + ": Landespolitik und Wirtschaft, letzte 48 Stunden";} },
-  { id:"kommune", label:function(){return cur.place.ort;}, file:null,
+  { id:"kommune", label:function(){return cur.place.ort;},
+    file:function(){return cur.plz === "34132" ? "data/kommune-34132.json" : null;},
     meta:"Kommunalpolitik · Google News zuerst",
     gnQ:function(){return '"' + cur.place.ort + '" Kommunalpolitik OR Stadtrat OR Gemeinderat OR Rathaus when:7d';},
     gnFilter:function(){return cur.place.ort + ": kommunale Politik und Verwaltung, letzte 7 Tage";} }
@@ -358,6 +359,13 @@ function hhmm(d) {
   d = d instanceof Date ? d : new Date(d);
   if (isNaN(d)) return "–";
   return String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
+}
+function stamp(s) {
+  var d = new Date(s); if (isNaN(d)) return "unbekannt";
+  var t = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0") + " Uhr";
+  var n = new Date();
+  if (d.toDateString() === n.toDateString()) return t;
+  return d.toLocaleDateString("de-DE", {day: "numeric", month: "short"}) + ", " + t;
 }
 function timeago(s) {
   if (!s) return "";
@@ -496,8 +504,8 @@ function renderRubrik() {
   $("rubrikMeta").textContent = "Beiträge werden geladen …";
   $("gnBtn").href = gnSearch(t.gnQ());
   $("gnFilter").textContent = t.gnFilter();
-  if (cur.tab === "kommune") loadKommune();
-  else loadFixed(t);
+  var f = t.file && t.file();
+  if (f) loadFixed(t); else loadKommune();
 }
 
 function metaLine(t, updated) {
@@ -516,6 +524,7 @@ function loadFixed(t, force) {
       if (tabDef(cur.tab).file && tabDef(cur.tab).file() === file) renderFixed(t, data);
     })
     .catch(function () {
+      if (cur.tab === "kommune") { loadKommune(); return; }
       if (location.protocol === "file:") { renderDemo(t); return; }
       if (c) { renderFixed(t, c.data); return; }
       renderLoadError(t, file);
@@ -529,6 +538,7 @@ function renderFixed(t, data) {
   (data.sources || []).forEach(function (src) {
     box.appendChild(buildBox(t, {
       id: src.id, name: src.name, home: src.home,
+      kicker: src.kicker, searchUrl: src.search,
       items: src.items || [], stale: !!src.stale, err: !!src.err,
       retry: function () { loadFixed(t, true); }
     }));
@@ -852,33 +862,32 @@ function aiPrompt(rubrik, coll) {
   return head + "\n\nRubrik: " + rubrik + "\n\nBeiträge:\n" + coll.lines.join("\n");
 }
 
-function callPollinations(prompt) {
-  var body = JSON.stringify({
-    model: "openai", private: true, referrer: "merricksblatt.janrickmer.de",
-    messages: [{role: "user", content: prompt}]
+function capLines(lines, maxItems, maxLen) {
+  return lines.slice(0, maxItems).map(function (l) {
+    return l.length > maxLen ? l.slice(0, maxLen - 2) + " …" : l;
   });
+}
+
+function callPollinations(prompt) {
+  // Nur noch ein schneller POST-Versuch: der Auftragstext reist im
+  // Anfragekörper (keine Adresslängen-Grenze); scheitert er, übernimmt
+  // sofort die lokale Fassung.
   function ok(txt) {
     txt = (txt || "").trim();
     if (txt.length < 60 || txt.charAt(0) === "<") throw new Error("unbrauchbare Antwort");
     return txt;
   }
-  var getUrl = "https://text.pollinations.ai/" + encodeURIComponent(prompt) +
-    "?model=openai&private=true&referrer=merricksblatt.janrickmer.de";
   return fetchTimeout("https://text.pollinations.ai/openai",
-      {method:"POST", headers:{"Content-Type":"application/json"}, body: body}, 30000)
+      {method: "POST", headers: {"Content-Type": "application/json"},
+       body: JSON.stringify({
+         model: "openai", private: true, referrer: "merricksblatt.janrickmer.de",
+         messages: [{role: "user", content: prompt}]
+       })}, 15000)
     .then(function (r) {
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.json().then(function (j) {
         return ok(j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content);
       }, function () { return r.text().then(ok); });
-    })
-    .catch(function () {
-      return fetchTimeout(getUrl, {}, 25000)
-        .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.text().then(ok); });
-    })
-    .catch(function () {
-      return fetchTimeout(PROXIES[0](getUrl), {}, 25000)
-        .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.text().then(ok); });
     });
 }
 
@@ -949,8 +958,47 @@ function localSummary(coll) {
   return paras;
 }
 
+function renderAiResult(footnote) {
+  var out = $("kiText"); out.textContent = "";
+  cur.aiParas.forEach(function (p) { out.appendChild(el("p", null, p)); });
+  $("kiFoot").textContent = footnote;
+  $("speakBtn").textContent = "Textzusammenfassung vorlesen";
+  $("kiBusy").classList.add("hidden");
+  $("kiDone").classList.remove("hidden");
+}
+
+function splitParas(txt) {
+  return txt.split(/\n{2,}/).map(function (p) { return p.replace(/\s+/g, " ").trim(); }).filter(Boolean);
+}
+
 $("kiStart").addEventListener("click", function () {
   var t = tabDef(cur.tab);
+  var rubrik = t.label();
+
+  // Feste Rubriken (inkl. vorgeladener Kommune): Zusammenfassung aus dem Datenpaket
+  var f = t.file && t.file();
+  if (f) {
+    var c = cur.cache[f];
+    var ki = c && c.data && c.data.ki;
+    $("kiIdle").classList.add("hidden");
+    cur.ai = "done";
+    if (ki && ki.text) {
+      cur.aiLocal = false;
+      cur.aiParas = splitParas(ki.text);
+      renderAiResult("Erstellt aus " + (ki.basis || "den") + " Beiträgen (jeweils die ersten drei je Quelle) · " +
+        rubrik + " · GitHub Models · Stand " + stamp(ki.generated));
+    } else {
+      var coll0 = collectForAi();
+      if (!coll0.count) { resetAi(); return; }
+      cur.aiLocal = true;
+      cur.aiParas = localSummary(coll0);
+      renderAiResult("Erstellt aus " + coll0.count + " Titeln und Inhaltsangaben dieser Seite · " + rubrik +
+        " · lokale Kurzfassung, vorbereitete Zusammenfassung liegt noch nicht vor");
+    }
+    return;
+  }
+
+  // Kommunales: kurzer Live-Versuch (15 s), sonst sofort die lokale Fassung
   var coll = collectForAi();
   if (!coll.count) return;
   cur.ai = "busy"; cur.aiCount = coll.count;
@@ -958,23 +1006,19 @@ $("kiStart").addEventListener("click", function () {
   $("kiDone").classList.add("hidden");
   $("kiBusy").classList.remove("hidden");
   $("kiBusyLabel").textContent = "Fasst " + coll.count + " angezeigte Beiträge zusammen …";
-  var rubrik = t.label();
   var tabAtStart = cur.tab;
+  var prompt = aiPrompt(rubrik, {lines: capLines(coll.lines, 20, 180),
+                                 missing: coll.missing, count: coll.count});
 
-  callPollinations(aiPrompt(rubrik, coll)).then(function (txt) {
-    return {paras: txt.split(/\n{2,}/).map(function (p) { return p.replace(/\s+/g, " ").trim(); }).filter(Boolean), local: false};
+  callPollinations(prompt).then(function (txt) {
+    return {paras: splitParas(txt), local: false};
   }).catch(function () {
     return {paras: localSummary(coll), local: true};
   }).then(function (res) {
     if (cur.tab !== tabAtStart) return;
     cur.ai = "done"; cur.aiParas = res.paras; cur.aiLocal = res.local;
-    $("kiBusy").classList.add("hidden");
-    var out = $("kiText"); out.textContent = "";
-    res.paras.forEach(function (p) { out.appendChild(el("p", null, p)); });
-    $("kiFoot").textContent = "Erstellt aus " + coll.count + " Titeln und Inhaltsangaben dieser Seite · " + rubrik +
-      (res.local ? " · lokale Kurzfassung, KI-Dienst war nicht erreichbar" : " · Pollinations.AI");
-    $("speakBtn").textContent = "Textzusammenfassung vorlesen";
-    $("kiDone").classList.remove("hidden");
+    renderAiResult("Erstellt aus " + coll.count + " Titeln und Inhaltsangaben dieser Seite · " + rubrik +
+      (res.local ? " · lokale Kurzfassung, KI-Dienst war nicht erreichbar" : " · Pollinations.AI"));
   });
 });
 
@@ -1041,7 +1085,7 @@ renderRubrik();
 setInterval(function () {
   if (document.hidden) return;
   var t = tabDef(cur.tab);
-  if (t.file) loadFixed(t, true);
+  if (t.file && t.file()) loadFixed(t, true);
 }, 10 * 60000);
 
 })();
