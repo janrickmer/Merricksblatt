@@ -213,7 +213,7 @@ a.pillbtn:hover{background:var(--hover);color:var(--ink);text-decoration:none}
   <footer class="foot">
     <span>Merricksblatt · Übersicht fremder Inhalte, alle Rechte bei den verlinkten Medien</span>
     <span>Standort: <span id="plzFoot">–</span></span>
-    <span class="credits">PLZ-Zuordnung: GeoNames-Daten via zauberware (CC BY 4.0) · Nachrichtendaten: RSS-Feeds der Verlage &amp; Google News, halbstündlich über GitHub Actions aktualisiert · KI-Zusammenfassung: im Datenlauf vorbereitet (Anbieter steht in der Fußnote der Zusammenfassung); bei „Kommunales" mit anderer PLZ Live-Versuch plus lokale Ersatzfassung · Vorlesen: Sprachausgabe des Browsers</span>
+    <span class="credits">PLZ-Zuordnung: GeoNames-Daten via zauberware (CC BY 4.0) · Nachrichtendaten: RSS-Feeds der Verlage &amp; Google News, halbstündlich über GitHub Actions aktualisiert · KI-Zusammenfassung: live im Browser über Puter.js (Modell-Kaskade der bewährten Vorversion), optional serverseitig vorbereitet; lokale Ersatzfassung als Netz · Vorlesen: Sprachausgabe des Browsers</span>
   </footer>
 
 </div>
@@ -237,6 +237,7 @@ a.pillbtn:hover{background:var(--hover);color:var(--ink);text-decoration:none}
 <noscript><p style="max-width:640px;margin:20px auto;font-family:Calibri,Carlito,sans-serif">Merricksblatt benötigt JavaScript, um die Nachrichten der Verlage zu laden und anzuzeigen.</p></noscript>
 
 <script src="assets/plz.js"></script>
+<script src="https://js.puter.com/v2/"></script>
 <script>
 (function () {
 "use strict";
@@ -841,7 +842,7 @@ function collectForAi() {
     if (!s.items.length) { missing.push(s.name); return; }
     s.items.forEach(function (it) {
       count++;
-      lines.push("• " + s.name + " – " + it.t + (it.s ? ": " + it.s : ""));
+      lines.push("- " + it.t + (it.s ? " — " + it.s : ""));
     });
   });
   return {lines: lines, missing: missing, count: count};
@@ -854,7 +855,8 @@ function aiPrompt(rubrik, coll) {
     'klar strukturierten Fließtext von 60 bis 100 Wörtern: beginne mit den wichtigsten politischen ' +
     'Entwicklungen, gehe dann zu den wirtschaftlichen Themen über und verbinde verwandte Meldungen ' +
     'mit Übergängen zu einem roten Faden, statt sie aufzuzählen. Keine Aufzählungszeichen, keine ' +
-    'Überschriften, keine Quellenliste.';
+    'Überschriften, keine Quellenliste, keine Einleitungsfloskel, keine Rückfragen. ' +
+    'Beginne sofort mit dem ersten Satz.';
   if (coll.missing.length) {
     head += ' Erwähne in einem kurzen Schlusssatz, dass folgende Quellen keine Beiträge lieferten: ' +
       coll.missing.join(", ") + ".";
@@ -862,33 +864,53 @@ function aiPrompt(rubrik, coll) {
   return head + "\n\nRubrik: " + rubrik + "\n\nBeiträge:\n" + coll.lines.join("\n");
 }
 
-function capLines(lines, maxItems, maxLen) {
-  return lines.slice(0, maxItems).map(function (l) {
-    return l.length > maxLen ? l.slice(0, maxLen - 2) + " …" : l;
-  });
+/* ====== KI-Zusammenfassung live – Mechanik 1:1 aus der bewährten alten Version (Puter.js) ====== */
+
+// Reihenfolge der Modelle: schnell+günstig zuerst, dann robuste Alternativen (wie in Merricks.html).
+var PUTER_MODELS = ["openai/gpt-5.4-nano", "openai/gpt-5-nano", "google/gemini-2.5-flash", "anthropic/claude-sonnet-4-6"];
+
+// Antwort von Puter kann String oder Objekt (je Modell) sein → robust extrahieren (unverändert übernommen).
+function puterExtract(r) {
+  if (r == null) return "";
+  if (typeof r === "string") return r;
+  if (r.message) {
+    var c = r.message.content;
+    if (typeof c === "string") return c;
+    if (Array.isArray(c)) return c.map(function (p) { return (p && (p.text || p.content)) || ""; }).join("").trim();
+  }
+  if (typeof r.text === "string") return r.text;
+  if (typeof r.content === "string") return r.content;
+  if (r.toString && r.toString() !== "[object Object]") return r.toString();
+  return "";
 }
 
-function callPollinations(prompt) {
-  // Nur noch ein schneller POST-Versuch: der Auftragstext reist im
-  // Anfragekörper (keine Adresslängen-Grenze); scheitert er, übernimmt
-  // sofort die lokale Fassung.
-  function ok(txt) {
-    txt = (txt || "").trim();
-    if (txt.length < 60 || txt.charAt(0) === "<") throw new Error("unbrauchbare Antwort");
-    return txt;
+function puterCallModel(prompt, model) {
+  var to;
+  return Promise.race([
+    window.puter.ai.chat(prompt, {model: model, temperature: 0.3}),
+    new Promise(function (_, rej) { to = setTimeout(function () { rej(new Error("Zeitüberschreitung")); }, 30000); })
+  ]).then(function (r) {
+    clearTimeout(to);
+    var t = puterExtract(r).trim();
+    if (!t) throw new Error("leere Antwort");
+    return t;
+  }, function (e) { clearTimeout(to); throw e; });
+}
+
+function callPuter(prompt) {
+  if (typeof window.puter === "undefined" || !window.puter.ai || typeof window.puter.ai.chat !== "function") {
+    return Promise.reject(new Error("Puter.js nicht geladen (offline, blockiert oder lokal geöffnet)"));
   }
-  return fetchTimeout("https://text.pollinations.ai/openai",
-      {method: "POST", headers: {"Content-Type": "application/json"},
-       body: JSON.stringify({
-         model: "openai", private: true, referrer: "merricksblatt.janrickmer.de",
-         messages: [{role: "user", content: prompt}]
-       })}, 15000)
-    .then(function (r) {
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      return r.json().then(function (j) {
-        return ok(j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content);
-      }, function () { return r.text().then(ok); });
+  if (prompt.length > 6000) prompt = prompt.slice(0, 6000);   // Deckel wie in der alten Version
+  var lastModel = null;
+  var chain = Promise.reject();
+  PUTER_MODELS.forEach(function (m) {
+    chain = chain.catch(function () {
+      lastModel = m;
+      return puterCallModel(prompt, m).then(function (t) { return {text: t, model: m}; });
     });
+  });
+  return chain;
 }
 
 var DE_STOP = {"der":1,"die":1,"das":1,"und":1,"oder":1,"aber":1,"mit":1,"von":1,"für":1,"auf":1,"des":1,"den":1,"dem":1,"ein":1,"eine":1,"einer":1,"eines":1,"einem":1,"einen":1,"ist":1,"sind":1,"war":1,"wird":1,"werden":1,"nach":1,"über":1,"bei":1,"aus":1,"als":1,"auch":1,"sich":1,"nicht":1,"noch":1,"mehr":1,"sein":1,"seine":1,"ihre":1,"beim":1,"zum":1,"zur":1,"hat":1,"haben":1,"sollen":1,"soll":1,"laut":1,"gegen":1,"unter":1,"vor":1,"seit":1,"bis":1,"dass":1,"wie":1,"ihre":1,"ihren":1,"diese":1,"dieser":1,"dieses":1,"neue":1,"neuen":1,"neuer":1};
@@ -980,45 +1002,38 @@ $("kiStart").addEventListener("click", function () {
   if (f) {
     var c = cur.cache[f];
     var ki = c && c.data && c.data.ki;
-    $("kiIdle").classList.add("hidden");
-    cur.ai = "done";
     if (ki && ki.text) {
+      $("kiIdle").classList.add("hidden");
+      cur.ai = "done";
       cur.aiLocal = false;
       cur.aiParas = splitParas(ki.text);
       renderAiResult("Erstellt aus " + (ki.basis || "den") + " Beiträgen (jeweils die ersten drei je Quelle) · " +
         rubrik + " · " + (ki.via || "KI") + " · Stand " + stamp(ki.generated));
-    } else {
-      var coll0 = collectForAi();
-      if (!coll0.count) { resetAi(); return; }
-      cur.aiLocal = true;
-      cur.aiParas = localSummary(coll0);
-      renderAiResult("Erstellt aus " + coll0.count + " Titeln und Inhaltsangaben dieser Seite · " + rubrik +
-        " · lokale Kurzfassung, vorbereitete Zusammenfassung liegt noch nicht vor");
+      return;
     }
-    return;
   }
 
-  // Kommunales: kurzer Live-Versuch (15 s), sonst sofort die lokale Fassung
+  // Live-Weg (Mechanik der alten Version): Puter-Modellkaskade, lokale Fassung als Netz
   var coll = collectForAi();
-  if (!coll.count) return;
+  if (!coll.count) { resetAi(); return; }
   cur.ai = "busy"; cur.aiCount = coll.count;
   $("kiIdle").classList.add("hidden");
   $("kiDone").classList.add("hidden");
   $("kiBusy").classList.remove("hidden");
   $("kiBusyLabel").textContent = "Fasst " + coll.count + " angezeigte Beiträge zusammen …";
   var tabAtStart = cur.tab;
-  var prompt = aiPrompt(rubrik, {lines: capLines(coll.lines, 20, 180),
-                                 missing: coll.missing, count: coll.count});
+  var prompt = aiPrompt(rubrik, coll);
 
-  callPollinations(prompt).then(function (txt) {
-    return {paras: splitParas(txt), local: false};
+  callPuter(prompt).then(function (res) {
+    return {paras: splitParas(res.text), local: false, model: res.model};
   }).catch(function () {
     return {paras: localSummary(coll), local: true};
   }).then(function (res) {
     if (cur.tab !== tabAtStart) return;
     cur.ai = "done"; cur.aiParas = res.paras; cur.aiLocal = res.local;
     renderAiResult("Erstellt aus " + coll.count + " Titeln und Inhaltsangaben dieser Seite · " + rubrik +
-      (res.local ? " · lokale Kurzfassung, KI-Dienst war nicht erreichbar" : " · Pollinations.AI"));
+      (res.local ? " · lokale Kurzfassung, KI-Dienst war nicht erreichbar"
+                 : " · Puter.js (" + String(res.model).split("/").pop() + ")"));
   });
 });
 
