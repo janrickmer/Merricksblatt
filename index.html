@@ -990,7 +990,9 @@ function renderAiResult(footnote) {
 }
 
 function splitParas(txt) {
-  return txt.split(/\n{2,}/).map(function (p) { return p.replace(/\s+/g, " ").trim(); }).filter(Boolean);
+  return txt.split(/\n{2,}/).map(function (p) {
+    return p.replace(/[*_`#]+/g, "").replace(/\s+/g, " ").trim();
+  }).filter(Boolean);
 }
 
 $("kiStart").addEventListener("click", function () {
@@ -1037,24 +1039,58 @@ $("kiStart").addEventListener("click", function () {
   });
 });
 
-/* ─────────────────────────── Vorlesen ───────────────────────────────── */
+/* ── Vorlesen: Mechanik 1:1 aus der bewährten alten Version (Merricks.html) ── */
 
-var voiceReady = false;
-function pickVoice() {
-  if (!window.speechSynthesis) return null;
-  var vs = speechSynthesis.getVoices();
-  for (var i = 0; i < vs.length; i++) if (/^de/i.test(vs[i].lang)) return vs[i];
-  return null;
+var __voices = [];
+function loadVoices() {
+  if (!window.speechSynthesis) return;
+  try { __voices = speechSynthesis.getVoices() || []; } catch (e) { __voices = []; }
 }
 if (window.speechSynthesis) {
-  speechSynthesis.onvoiceschanged = function () { voiceReady = true; };
+  loadVoices();
+  speechSynthesis.onvoiceschanged = loadVoices;
+}
+function pickVoice(lang) {
+  var l = (lang || "de").slice(0, 2).toLowerCase();
+  for (var i = 0; i < __voices.length; i++) {
+    if ((__voices[i].lang || "").slice(0, 2).toLowerCase() === l) return __voices[i];
+  }
+  return null;
 }
 
+var __ut = null;          // globale Referenz – sonst „vergisst" Chrome die Äußerung mitten im Satz
+var __speakKeep = null;   // Chrome-Eigenart: Sprachausgabe pausiert nach ~15 s → regelmäßig fortsetzen
+var __speakTimer = null;
+
 function stopSpeak() {
-  if (window.speechSynthesis) speechSynthesis.cancel();
+  __ut = null;
+  if (__speakKeep) { clearInterval(__speakKeep); __speakKeep = null; }
+  if (__speakTimer) { clearTimeout(__speakTimer); __speakTimer = null; }
+  try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) {}
   cur.speaking = false;
   $("speakBtn").textContent = "Textzusammenfassung vorlesen";
   $("speakingNote").classList.add("hidden");
+}
+
+function speakText(text) {
+  try { speechSynthesis.cancel(); } catch (e) {}
+  // Kurzer Abstand zwischen cancel() und speak(): sonst verschluckt Chrome die neue Äußerung.
+  __speakTimer = setTimeout(function () {
+    __speakTimer = null;
+    if (!cur.speaking) return;
+    var u = new SpeechSynthesisUtterance(String(text));
+    u.lang = "de-DE";
+    u.rate = 1.35;
+    var v = pickVoice(u.lang); if (v) u.voice = v;
+    u.onend = u.onerror = function () { if (__ut === u) stopSpeak(); };
+    __ut = u;
+    try { speechSynthesis.speak(u); } catch (e) { stopSpeak(); return; }
+    if (__speakKeep) clearInterval(__speakKeep);
+    __speakKeep = setInterval(function () {
+      if (__ut) { try { speechSynthesis.resume(); } catch (e) {} }
+      else { clearInterval(__speakKeep); __speakKeep = null; }
+    }, 8000);
+  }, 120);
 }
 
 $("speakBtn").addEventListener("click", function () {
@@ -1063,22 +1099,15 @@ $("speakBtn").addEventListener("click", function () {
     return;
   }
   if (cur.speaking) { stopSpeak(); return; }
-  var text = cur.aiParas.join(" ");
+  var text = cur.aiParas.join(" ").replace(/[*_`#]+/g, " ").replace(/\s+/g, " ").trim();
   if (!text) return;
-  speechSynthesis.cancel();
-  var u = new SpeechSynthesisUtterance(text);
-  u.lang = "de-DE";
-  u.rate = 1.35;
-  var v = pickVoice(); if (v) u.voice = v;
-  u.onend = stopSpeak;
-  u.onerror = stopSpeak;
   cur.speaking = true;
   $("speakBtn").textContent = "Vorlesen beenden";
   $("speakingNote").classList.remove("hidden");
-  speechSynthesis.speak(u);
+  speakText(text);
 });
 window.addEventListener("beforeunload", function () {
-  if (window.speechSynthesis) speechSynthesis.cancel();
+  try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) {}
 });
 
 /* ───────────────────────────── Start ────────────────────────────────── */
