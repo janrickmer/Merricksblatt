@@ -72,20 +72,25 @@ Repository-Aktivität – damit hält sich der Zeitplan selbst am Leben
   Bundesländer sind vorberechnet; der Tab zeigt automatisch das Land zur
   PLZ. Die Rubrik aktualisiert sich im offenen Browserfenster alle
   10 Minuten von selbst.
-* **Kommunales** wird live im Browser über Google-News-Suchen geladen
-  (Gemeinde kennt erst der Besucher), über eine Kette kostenloser
-  CORS-Proxys (allorigins → codetabs → allorigins/get). Scheitert eine
-  Quelle, gibt es „Erneut versuchen“ – und ganz unten immer den
-  Google-News-Button als Netz.
-* **PLZ**: erst Gerätestandort (Zuordnung über die eingebettete
-  Koordinatentabelle, ganz ohne externen Geo-Dienst), sonst Eingabefeld;
+* **Kommunales**: Für Kassel (alle Kasseler PLZ) kommt die Rubrik aus
+  `data/kommune-34132.json`. Für andere Orte zeigt die Seite zuerst einen
+  Hinweis; erst nach dem Klick auf „Lokale Nachrichten laden“ fragt der
+  Browser Google News über eine Kette kostenloser CORS-Proxys ab
+  (allorigins → codetabs → allorigins/get). Der Klick gilt nur für die
+  gewählte PLZ und die laufende Seite. Scheitert eine Quelle, gibt es
+  „Erneut versuchen“ – und ganz unten immer den Google-News-Button als Netz.
+* **PLZ**: beim ersten Besuch das Eingabefeld; der Gerätestandort wird nur
+  über den Knopf „Gerätestandort verwenden“ abgefragt (Zuordnung über die
+  eingebettete Koordinatentabelle, ganz ohne externen Geo-Dienst);
   ungültige Eingaben → 34132. Die gewählte PLZ merkt sich der Browser
   (localStorage), die Pille unter dem Slogan bleibt anklickbar.
-* **KI-Zusammenfassung**: fasst exakt die gerade angezeigten Titel und
-  Inhaltsangaben zusammen. Reihenfolge: Pollinations.AI (schlüsselfrei,
-  POST → GET → über Proxy); klappt keiner der drei Wege, springt eine
-  **lokale Kurzfassung** im Browser ein – der Knopf liefert also immer ein
-  Ergebnis. Die Fußnote weist ehrlich aus, welcher Weg es war.
+* **KI-Zusammenfassung**: Für die festen Rubriken zeigt der Knopf die im
+  Datenlauf vorbereitete Fassung. Fehlt sie (z. B. Kommunales außerhalb
+  Kassels), weist ein Hinweis am Knopf darauf hin; erst der Klick lädt
+  Puter.js und fasst die angezeigten Titel und Inhaltsangaben live
+  zusammen. Klappt das nicht, springt eine **lokale Kurzfassung** im
+  Browser ein – der Knopf liefert also immer ein Ergebnis. Die Fußnote weist
+  aus, welcher Weg es war.
 * **Vorlesen**: Sprachausgabe des Browsers, Deutsch, Tempo 1,35 – Knopf
   wechselt zu „Vorlesen beenden“.
 * **Lokale Vorschau**: `index.html` doppelt geklickt zeigt das komplette
