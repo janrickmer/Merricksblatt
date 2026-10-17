@@ -85,7 +85,7 @@ a.pillbtn:hover{background:var(--hover);color:var(--ink);text-decoration:none}
 .item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 22px;align-items:start;padding:19px 0;border-top:1px solid var(--rule)}
 .item .col{display:flex;flex-direction:column;gap:7px;min-width:0}
 .item .title{font-weight:700;font-size:clamp(17px,1.9vw,21px);line-height:1.28;color:var(--ink);text-wrap:pretty;text-decoration:none}
-.item .title:hover{color:var(--accent);text-decoration:underline;text-underline-offset:4px}
+.item a.title:hover{color:var(--accent);text-decoration:underline;text-underline-offset:4px}
 .item p{margin:0;max-width:74ch;font-size:15px;line-height:1.58;color:var(--ink-mild);text-wrap:pretty}
 .item time{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap;padding-top:5px}
 @media (max-width:560px){.item{grid-template-columns:1fr}.item time{padding-top:0}}
@@ -108,6 +108,7 @@ a.pillbtn:hover{background:var(--hover);color:var(--ink);text-decoration:none}
 .ki .desc{margin:0 0 18px;font-size:14px;color:var(--ink-mild);max-width:640px}
 .kibtn{background:var(--ink);color:#fff;font-size:15px;padding:13px 24px;border:0;border-radius:999px;cursor:pointer}
 .kibtn:hover{background:var(--accent)}
+.kihint{margin:12px 0 0;max-width:640px;font-size:13px;line-height:1.5;color:var(--ink-mild)}
 .kibusy{display:flex;align-items:center;gap:12px;font-size:14px;color:var(--ink-mild)}
 .spin-lg{display:block;width:17px;height:17px;border:2.5px solid var(--spin);border-top-color:var(--accent);border-radius:999px;animation:mbspin .7s linear infinite}
 .kiout{padding:22px clamp(18px,2.4vw,26px);background:#fff;border:1px solid var(--line);border-radius:20px}
@@ -122,6 +123,7 @@ a.pillbtn:hover{background:var(--hover);color:var(--ink);text-decoration:none}
 
 .foot{margin-top:40px;padding-top:18px;border-top:1px solid var(--rule);display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:space-between;font-size:12px;color:var(--muted)}
 .foot .credits{flex-basis:100%;font-size:11px}
+.foot a{color:inherit;text-decoration:underline;text-underline-offset:2px}
 
 .modalback{position:fixed;inset:0;display:grid;place-items:center;padding:20px;background:rgba(17,16,16,.5);z-index:20}
 .modal{width:min(430px,100%);background:#fff;border-radius:26px;padding:28px;display:flex;flex-direction:column;gap:14px}
@@ -192,6 +194,7 @@ a.pillbtn:hover{background:var(--hover);color:var(--ink);text-decoration:none}
 
     <div id="kiIdle">
       <button type="button" class="kibtn" id="kiStart">KI-Zusammenfassung aller angezeigten Informationen erstellen</button>
+      <p class="kihint hidden" id="kiHint"></p>
     </div>
     <div id="kiBusy" class="kibusy hidden">
       <span class="spin-lg" aria-hidden="true"></span>
@@ -213,7 +216,8 @@ a.pillbtn:hover{background:var(--hover);color:var(--ink);text-decoration:none}
   <footer class="foot">
     <span>Merricksblatt · Übersicht fremder Inhalte, alle Rechte bei den verlinkten Medien</span>
     <span>Standort: <span id="plzFoot">–</span></span>
-    <span class="credits">PLZ-Zuordnung: GeoNames-Daten via zauberware (CC BY 4.0) · Nachrichtendaten: RSS-Feeds der Verlage &amp; Google News, halbstündlich über GitHub Actions aktualisiert · KI-Zusammenfassung: live im Browser über Puter.js (Modell-Kaskade der bewährten Vorversion), optional serverseitig vorbereitet; lokale Ersatzfassung als Netz · Vorlesen: Sprachausgabe des Browsers</span>
+    <span><a href="impressum.html">Impressum &amp; Datenschutz</a></span>
+    <span class="credits">PLZ-Zuordnung: GeoNames-Daten via zauberware (CC BY 4.0) · Nachrichtendaten: RSS-Feeds der Verlage &amp; Google News, halbstündlich über GitHub Actions aktualisiert · KI-Zusammenfassung: serverseitig vorbereitet, sonst auf Klick live im Browser über Puter.js (wird erst dann geladen); lokale Ersatzfassung als Netz · Vorlesen: Sprachausgabe des Browsers</span>
   </footer>
 
 </div>
@@ -221,8 +225,8 @@ a.pillbtn:hover{background:var(--hover);color:var(--ink);text-decoration:none}
 <div class="modalback hidden" id="plzModal" role="dialog" aria-modal="true" aria-labelledby="plzModalTitle">
   <div class="modal">
     <p class="kick">Standort</p>
-    <h3 id="plzModalTitle">Postleitzahl konnte nicht ermittelt werden</h3>
-    <p class="body" id="plzModalBody">Bitte geben Sie Ihre Postleitzahl ein, damit die Punkte „Bundesland“ und „Kommunales“ passende Nachrichten zeigen. Ohne Angabe verwenden wir 34132.</p>
+    <h3 id="plzModalTitle">Postleitzahl eingeben</h3>
+    <p class="body" id="plzModalBody">Bitte geben Sie Ihre Postleitzahl ein, damit die Rubriken „Bundesland“ und „Kommunales“ passende Nachrichten zeigen. Ohne Angabe verwenden wir 34132.</p>
     <input class="plzin" id="plzInput" inputmode="numeric" maxlength="5" placeholder="z. B. 34132" autocomplete="postal-code">
     <p class="err hidden" id="plzErr">Keine gültige deutsche Postleitzahl. Wir verwenden 34132.</p>
     <div class="mrow">
@@ -237,7 +241,7 @@ a.pillbtn:hover{background:var(--hover);color:var(--ink);text-decoration:none}
 <noscript><p style="max-width:640px;margin:20px auto;font-family:Calibri,Carlito,sans-serif">Merricksblatt benötigt JavaScript, um die Nachrichten der Verlage zu laden und anzuzeigen.</p></noscript>
 
 <script src="assets/plz.js"></script>
-<script src="https://js.puter.com/v2/"></script>
+<!-- Puter.js wird nicht beim Öffnen geladen, sondern erst beim Live-Weg der KI-Zusammenfassung (loadPuter). -->
 <script>
 (function () {
 "use strict";
@@ -340,7 +344,7 @@ var TABS = [
     gnQ:function(){return '"' + landName() + '" Landespolitik OR Landtag OR ' + (CAPITALS[cur.place.land] || "") + " when:2d";},
     gnFilter:function(){return landName() + ": Landespolitik und Wirtschaft, letzte 48 Stunden";} },
   { id:"kommune", label:function(){return cur.place.ort;},
-    file:function(){return cur.plz === "34132" ? "data/kommune-34132.json" : null;},
+    file:function(){return (cur.plz === "34132" || (cur.place && cur.place.ort === "Kassel")) ? "data/kommune-34132.json" : null;},
     meta:"Kommunalpolitik · Google News zuerst",
     gnQ:function(){return '"' + cur.place.ort + '" Kommunalpolitik OR Stadtrat OR Gemeinderat OR Rathaus when:7d';},
     gnFilter:function(){return cur.place.ort + ": kommunale Politik und Verwaltung, letzte 7 Tage";} }
@@ -355,6 +359,20 @@ function el(tag, cls, text) {
   if (cls) n.className = cls;
   if (text != null) n.textContent = text;
   return n;
+}
+// Adressen aus Feeds, Proxys und data/*.json nur als absolute http(s)-Links übernehmen,
+// alles andere (javascript:, data:, relative Pfade …) ergibt "" → Link wird weggelassen.
+function safeUrl(u) {
+  if (!u) return "";
+  try {
+    var p = new URL(String(u));
+    return (p.protocol === "http:" || p.protocol === "https:") ? p.href : "";
+  } catch (e) { return ""; }
+}
+function extLink(text, href, cls) {
+  var a = el("a", cls || null, text);
+  a.href = href; a.target = "_blank"; a.rel = "noopener";
+  return a;
 }
 function hhmm(d) {
   d = d instanceof Date ? d : new Date(d);
@@ -450,13 +468,12 @@ function tryGeolocate(onFail) {
 }
 
 var modalMode = "auto";
-function openModal(mode) {
+function openModal(mode, note) {
   modalMode = mode;
-  $("plzModalTitle").textContent = mode === "auto"
-    ? "Postleitzahl konnte nicht ermittelt werden" : "Postleitzahl ändern";
-  $("plzModalBody").textContent = mode === "auto"
-    ? "Bitte geben Sie Ihre Postleitzahl ein, damit die Punkte „Bundesland“ und „Kommunales“ passende Nachrichten zeigen. Ohne Angabe verwenden wir 34132."
-    : "Geben Sie eine deutsche Postleitzahl ein – die Rubriken „Bundesland“ und „Kommunales“ richten sich danach.";
+  $("plzModalTitle").textContent = mode === "auto" ? "Postleitzahl eingeben" : "Postleitzahl ändern";
+  $("plzModalBody").textContent = (note || "") + (mode === "auto"
+    ? "Bitte geben Sie Ihre Postleitzahl ein, damit die Rubriken „Bundesland“ und „Kommunales“ passende Nachrichten zeigen. Ohne Angabe verwenden wir 34132."
+    : "Geben Sie eine deutsche Postleitzahl ein – die Rubriken „Bundesland“ und „Kommunales“ richten sich danach.");
   $("plzInput").value = mode === "auto" ? "" : cur.plz;
   $("plzErr").classList.add("hidden");
   $("plzModal").classList.remove("hidden");
@@ -468,13 +485,15 @@ function initPlz() {
   var saved = null;
   try { saved = localStorage.getItem("mb_plz"); } catch (e) {}
   if (saved && PLZMAP[saved]) { applyPlz(saved); return; }
-  tryGeolocate(function () { openModal("auto"); });
+  // Erster Besuch: Standort nie von selbst abfragen, sondern nach der PLZ fragen.
+  // Die Geolocation-API läuft nur über den Knopf „Gerätestandort verwenden“.
+  openModal("auto");
 }
 
 $("plzChange").addEventListener("click", function () { openModal("manual"); });
 $("plzGeo").addEventListener("click", function () {
   closeModal();
-  tryGeolocate(function () { openModal(modalMode); });
+  tryGeolocate(function () { openModal(modalMode, "Der Gerätestandort konnte nicht ermittelt werden. "); });
 });
 $("plzInput").addEventListener("input", function () {
   this.value = this.value.replace(/\D/g, "").slice(0, 5);
@@ -505,6 +524,7 @@ function renderRubrik() {
   $("rubrikMeta").textContent = "Beiträge werden geladen …";
   $("gnBtn").href = gnSearch(t.gnQ());
   $("gnFilter").textContent = t.gnFilter();
+  $("kiHint").classList.add("hidden");   // erst nach dem Laden ist klar, ob eine vorbereitete Fassung da ist
   var f = t.file && t.file();
   if (f) loadFixed(t); else loadKommune();
 }
@@ -525,9 +545,9 @@ function loadFixed(t, force) {
       if (tabDef(cur.tab).file && tabDef(cur.tab).file() === file) renderFixed(t, data);
     })
     .catch(function () {
+      if (c) { renderFixed(t, c.data); return; }
       if (cur.tab === "kommune") { loadKommune(); return; }
       if (location.protocol === "file:") { renderDemo(t); return; }
-      if (c) { renderFixed(t, c.data); return; }
       renderLoadError(t, file);
     });
 }
@@ -544,10 +564,13 @@ function renderFixed(t, data) {
       retry: function () { loadFixed(t, true); }
     }));
   });
+  updateKiHint();
 }
 
 function showSkeletons() {
   var box = $("sections"); box.textContent = "";
+  cur.rendered = [];
+  cur.loadingRubrik = true;               // bis eine Rubrik fertig angezeigt ist (updateKiHint)
   for (var i = 0; i < 4; i++) {
     var s = el("section", "srcbox");
     var head = el("div", "srchead");
@@ -582,6 +605,7 @@ function renderLoadError(t, file) {
   s.appendChild(n);
   box.appendChild(s);
   cur.rendered = [];
+  updateKiHint();
 }
 
 /* ─────────────────────── Quelle als Kasten bauen ────────────────────── */
@@ -624,11 +648,8 @@ function buildBox(t, src) {
       ? "Keine aktuellen Treffer bei " + src.name + " zu " + cur.place.ort + "."
       : "Zurzeit keine passenden Beiträge von " + src.name + " in dieser Rubrik.";
     n2.appendChild(el("p", null, msg));
-    if (src.searchUrl) {
-      var a0 = el("a", null, "Bei Google News suchen →");
-      a0.href = src.searchUrl; a0.target = "_blank"; a0.rel = "noopener";
-      n2.appendChild(a0);
-    }
+    var su = safeUrl(src.searchUrl);
+    if (su) n2.appendChild(extLink("Bei Google News suchen →", su));
     box.appendChild(n2);
     cur.rendered.push({name: src.name, items: []});
     return box;
@@ -638,9 +659,8 @@ function buildBox(t, src) {
   shown.forEach(function (it) {
     var art = el("article", "item");
     var col = el("div", "col");
-    var a = el("a", "title", it.t);
-    a.href = it.u; a.target = "_blank"; a.rel = "noopener";
-    col.appendChild(a);
+    var u = safeUrl(it.u);
+    col.appendChild(u ? extLink(it.t, u, "title") : el("span", "title", it.t));
     if (it.s) col.appendChild(el("p", null, it.s));
     art.appendChild(col);
     art.appendChild(el("time", null, timeago(it.d)));
@@ -659,10 +679,9 @@ function buildBox(t, src) {
     });
     mw.appendChild(mb);
   } else {
-    mw.appendChild(document.createTextNode("Alle geladenen Beiträge angezeigt · "));
-    var more = el("a", null, "Mehr direkt bei " + src.name + " →");
-    more.href = src.home || src.searchUrl || "#"; more.target = "_blank"; more.rel = "noopener";
-    mw.appendChild(more);
+    var mu = safeUrl(src.home) || safeUrl(src.searchUrl);
+    mw.appendChild(document.createTextNode("Alle geladenen Beiträge angezeigt" + (mu ? " · " : "")));
+    if (mu) mw.appendChild(extLink("Mehr direkt bei " + src.name + " →", mu));
   }
   box.appendChild(mw);
   return box;
@@ -704,8 +723,38 @@ function kommuneSources() {
   return list;
 }
 
+// Weiterleitungsdienste erst nach ausdrücklichem Klick; die Entscheidung gilt nur für die
+// laufende Seite (Arbeitsspeicher, keine Speicherung im Browser).
+var proxyConsent = null;   // PLZ, für die der Klick gilt
+
+function renderKommuneAsk(t) {
+  $("rubrikMeta").textContent = t.meta + " · Laden auf Wunsch";
+  var box = $("sections"); box.textContent = "";
+  cur.rendered = [];
+  var s = el("section", "srcbox");
+  var head = el("div", "srchead");
+  head.appendChild(el("h3", null, "Lokale Nachrichten für " + cur.place.ort));
+  head.appendChild(el("span", "kicker", "Google News · über Weiterleitungsdienste"));
+  s.appendChild(head);
+  var n = el("div", "notebox");
+  var p = el("p", null, "Für diesen Ort liegen keine vorbereiteten Meldungen vor. Auf Wunsch fragt Ihr Browser " +
+    "Google News über öffentliche Weiterleitungsdienste ab (api.allorigins.win, ersatzweise api.codetabs.com). " +
+    "Diese erhalten Ihre IP-Adresse und die Suchanfrage mit dem Ortsnamen; wer sie betreibt und wo ihre Server stehen, " +
+    "ist nicht bekannt, eine Verarbeitung außerhalb der EU ist möglich – auch in Ländern ohne angemessenes Datenschutzniveau, " +
+    "wo gleichwertige Schutzgarantien fehlen und Behörden womöglich zugreifen können. ");
+  p.appendChild(extLink("Impressum & Datenschutz", "impressum.html#datenschutz"));
+  n.appendChild(p);
+  var b = el("button", "btn-quiet", "Lokale Nachrichten laden"); b.type = "button";
+  b.addEventListener("click", function () { proxyConsent = cur.plz; loadKommune(); });
+  n.appendChild(b);
+  s.appendChild(n);
+  box.appendChild(s);
+  updateKiHint();
+}
+
 function loadKommune() {
   var t = tabDef("kommune");
+  if (proxyConsent !== cur.plz) { renderKommuneAsk(t); return; }
   var plz = cur.plz;
   if (!cur.kommune[plz]) cur.kommune[plz] = {};
   var store = cur.kommune[plz];
@@ -721,6 +770,7 @@ function loadKommune() {
     box.appendChild(node);
   });
   updateKommuneMeta(store, srcs);
+  updateKiHint();
 
   var queue = srcs.filter(function (s) { return !store[s.id]; });
   var running = 0;
@@ -797,8 +847,10 @@ function parseGnXml(xmlText) {
     var srcName = srcEl ? srcEl.textContent.trim() : "";
     var s = g("description");
     if (s) {
-      var tmp = document.createElement("div"); tmp.innerHTML = s;
-      s = (tmp.textContent || "").replace(/\s+/g, " ").trim();
+      // HTML der Beschreibung in einem inaktiven Dokument zerlegen: dort laufen keine Skripte
+      // und keine Ereignisse (<img onerror> o. Ä.), es wird nichts nachgeladen.
+      var hd = new DOMParser().parseFromString(s, "text/html");
+      s = ((hd.body && hd.body.textContent) || "").replace(/\s+/g, " ").trim();
     }
     if (srcName && t.slice(-srcName.length - 3) === " - " + srcName) {
       t = t.slice(0, -(srcName.length + 3)).trim();
@@ -825,6 +877,7 @@ function renderDemo(t) {
   MEDIA.slice(0, 4).forEach(function (m) {
     box.appendChild(buildBox(t, {id:m[0], name:m[1], home:m[2], kicker:"Vorschau · Beispieldaten", items:demo}));
   });
+  updateKiHint();
 }
 
 /* ───────────────────────── KI-Zusammenfassung ───────────────────────── */
@@ -834,6 +887,31 @@ function resetAi() {
   $("kiIdle").classList.remove("hidden");
   $("kiBusy").classList.add("hidden");
   $("kiDone").classList.add("hidden");
+}
+
+// Vorbereitete Zusammenfassung der aktuellen Rubrik aus dem Datenpaket (oder null → Live-Weg über Puter)
+function preparedKi() {
+  var t = tabDef(cur.tab);
+  var f = t.file && t.file();
+  var c = f && cur.cache[f];
+  var ki = c && c.data && c.data.ki;
+  return (ki && ki.text) ? ki : null;
+}
+
+// Hinweis direkt am Knopf, bevor Daten an Puter gehen – nur ohne vorbereitete Fassung
+function updateKiHint() {
+  cur.loadingRubrik = false;
+  var h = $("kiHint");
+  if (preparedKi()) { h.classList.add("hidden"); h.textContent = ""; return; }
+  var name = cur.tab === "kommune" ? "der Ortsname „" + cur.place.ort + "“"
+    : cur.tab === "land" ? "der Name des Bundeslands „" + landName() + "“"
+    : "der Rubrikname „" + tabDef(cur.tab).label() + "“";
+  h.textContent = "Für diese Rubrik liegt keine vorbereitete Zusammenfassung vor. Beim Klick gehen die angezeigten " +
+    "Schlagzeilen mit ihren Kurztexten und " + name + " an den Dienst Puter (USA), der sie an einen KI-Anbieter " +
+    "(OpenAI, Google oder Anthropic) weiterleitet; Puter erhält dabei auch Ihre IP-Adresse. In den USA gilt kein mit der EU " +
+    "gleichwertiger Datenschutz, Behörden können womöglich zugreifen. ";
+  h.appendChild(extLink("Impressum & Datenschutz", "impressum.html#datenschutz"));
+  h.classList.remove("hidden");
 }
 
 function collectForAi() {
@@ -897,20 +975,47 @@ function puterCallModel(prompt, model) {
   }, function (e) { clearTimeout(to); throw e; });
 }
 
-function callPuter(prompt) {
-  if (typeof window.puter === "undefined" || !window.puter.ai || typeof window.puter.ai.chat !== "function") {
-    return Promise.reject(new Error("Puter.js nicht geladen (offline, blockiert oder lokal geöffnet)"));
-  }
-  if (prompt.length > 6000) prompt = prompt.slice(0, 6000);   // Deckel wie in der alten Version
-  var lastModel = null;
-  var chain = Promise.reject();
-  PUTER_MODELS.forEach(function (m) {
-    chain = chain.catch(function () {
-      lastModel = m;
-      return puterCallModel(prompt, m).then(function (t) { return {text: t, model: m}; });
+// Puter.js erst hier nachladen (nicht beim Öffnen der Seite); scheitert das, greift die lokale Fassung.
+var PUTER_SRC = "https://js.puter.com/v2/";
+var puterLoading = null;
+function puterReady() {
+  return typeof window.puter !== "undefined" && window.puter.ai && typeof window.puter.ai.chat === "function";
+}
+function loadPuter() {
+  if (puterReady()) return Promise.resolve();
+  if (!puterLoading) {
+    puterLoading = new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      var to = setTimeout(function () { fail("Zeitüberschreitung"); }, 15000);
+      function fail(why) {
+        clearTimeout(to); s.onload = s.onerror = null;
+        if (s.parentNode) s.parentNode.removeChild(s);
+        puterLoading = null;               // beim nächsten Klick neu versuchen
+        reject(new Error("Puter.js nicht geladen (" + why + ")"));
+      }
+      s.onload = function () {
+        clearTimeout(to);
+        if (puterReady()) resolve(); else fail("unvollständig");
+      };
+      s.onerror = function () { fail("offline, blockiert oder lokal geöffnet"); };
+      s.src = PUTER_SRC;
+      document.head.appendChild(s);
     });
+  }
+  return puterLoading;
+}
+
+function callPuter(prompt) {
+  if (prompt.length > 6000) prompt = prompt.slice(0, 6000);   // Deckel wie in der alten Version
+  return loadPuter().then(function () {
+    var chain = Promise.reject();
+    PUTER_MODELS.forEach(function (m) {
+      chain = chain.catch(function () {
+        return puterCallModel(prompt, m).then(function (t) { return {text: t, model: m}; });
+      });
+    });
+    return chain;
   });
-  return chain;
 }
 
 var DE_STOP = {"der":1,"die":1,"das":1,"und":1,"oder":1,"aber":1,"mit":1,"von":1,"für":1,"auf":1,"des":1,"den":1,"dem":1,"ein":1,"eine":1,"einer":1,"eines":1,"einem":1,"einen":1,"ist":1,"sind":1,"war":1,"wird":1,"werden":1,"nach":1,"über":1,"bei":1,"aus":1,"als":1,"auch":1,"sich":1,"nicht":1,"noch":1,"mehr":1,"sein":1,"seine":1,"ihre":1,"beim":1,"zum":1,"zur":1,"hat":1,"haben":1,"sollen":1,"soll":1,"laut":1,"gegen":1,"unter":1,"vor":1,"seit":1,"bis":1,"dass":1,"wie":1,"ihre":1,"ihren":1,"diese":1,"dieser":1,"dieses":1,"neue":1,"neuen":1,"neuer":1};
@@ -1000,22 +1105,21 @@ $("kiStart").addEventListener("click", function () {
   var rubrik = t.label();
 
   // Feste Rubriken (inkl. vorgeladener Kommune): Zusammenfassung aus dem Datenpaket
-  var f = t.file && t.file();
-  if (f) {
-    var c = cur.cache[f];
-    var ki = c && c.data && c.data.ki;
-    if (ki && ki.text) {
-      $("kiIdle").classList.add("hidden");
-      cur.ai = "done";
-      cur.aiLocal = false;
-      cur.aiParas = splitParas(ki.text);
-      renderAiResult("Erstellt aus " + (ki.basis || "den") + " Beiträgen (jeweils die ersten drei je Quelle) · " +
-        rubrik + " · " + (ki.via || "KI") + " · Stand " + stamp(ki.generated));
-      return;
-    }
+  var ki = preparedKi();
+  if (ki) {
+    $("kiIdle").classList.add("hidden");
+    cur.ai = "done";
+    cur.aiLocal = false;
+    cur.aiParas = splitParas(ki.text);
+    renderAiResult("Erstellt aus " + (ki.basis || "den") + " Beiträgen (jeweils die ersten drei je Quelle) · " +
+      rubrik + " · " + (ki.via || "KI") + " · Stand " + stamp(ki.generated));
+    return;
   }
 
-  // Live-Weg (Mechanik der alten Version): Puter-Modellkaskade, lokale Fassung als Netz
+  // Rubrik lädt noch: nichts senden (sonst gingen Schlagzeilen der vorherigen Rubrik hinaus)
+  if (cur.loadingRubrik) return;
+
+  // Live-Weg (Mechanik der alten Version): Puter.js nachladen, Modellkaskade, lokale Fassung als Netz
   var coll = collectForAi();
   if (!coll.count) { resetAi(); return; }
   cur.ai = "busy"; cur.aiCount = coll.count;
